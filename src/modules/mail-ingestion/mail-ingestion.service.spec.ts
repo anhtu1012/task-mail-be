@@ -3,6 +3,7 @@ import { MailIngestionService } from './mail-ingestion.service';
 import type { MailAccountRepository } from '../mail-accounts/repositories/mail-account.repository';
 import type { MailAccountsService } from '../mail-accounts/mail-accounts.service';
 import type { TasksService } from '../tasks/tasks.service';
+import type { UsersService } from '../users/users.service';
 
 // Type-only imports for the collaborators keep this test from pulling in PrismaService
 // (and the generated Prisma client) transitively — plain construction, no Nest DI container.
@@ -13,12 +14,14 @@ describe('MailIngestionService', () => {
     const buildOAuthClient = jest.fn();
     const mailAccountsService = { buildOAuthClient } as unknown as MailAccountsService;
     const tasksService = {} as TasksService;
+    const usersService = {} as UsersService;
 
     const service = new MailIngestionService(
       new ConfigService({}),
       mailAccountRepository,
       mailAccountsService,
       tasksService,
+      usersService,
     );
 
     await expect(service.pollMailAccounts()).resolves.toBeUndefined();

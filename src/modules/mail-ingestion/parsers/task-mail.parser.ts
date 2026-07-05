@@ -6,12 +6,18 @@ export type ParsedTaskMail = {
   deadline?: Date;
   priority: TaskPriority;
   attachments: string[];
+  assigneeEmail?: string;
 };
 
 const DEADLINE_REGEX =
   /(?:deadline|h[aạ]n)\s*:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/i;
 
 const URL_REGEX = /https?:\/\/[^\s<>"']+/gi;
+
+// Explicit "Giao cho: <email>" / "Gán cho: <email>" / "Assign to: <email>" directive
+// in the body names the intended assignee, so the task lands on the right person
+// even when the mail was received in a different (e.g. CC'd) connected mailbox.
+const ASSIGNEE_REGEX = /(?:giao\s*cho|g[aá]n\s*cho|assign(?:ed)?\s*to)\s*:\s*([^\s,;<>]+@[^\s,;<>]+)/i;
 
 const MAX_DESCRIPTION_LENGTH = 2000;
 
@@ -41,6 +47,11 @@ function extractLinks(bodyText: string): string[] {
   return Array.from(new Set(bodyText.match(URL_REGEX) ?? []));
 }
 
+function extractAssigneeEmail(bodyText: string): string | undefined {
+  const match = ASSIGNEE_REGEX.exec(bodyText);
+  return match ? match[1].toLowerCase() : undefined;
+}
+
 /**
  * Detects and extracts task fields from a mail subject/body using fixed rules
  * (no LLM): the subject must start with `prefix` (case-insensitive) to count as a task.
@@ -64,5 +75,6 @@ export function parseTaskMail(
     deadline: extractDeadline(body),
     priority: extractPriority(body),
     attachments: extractLinks(body),
+    assigneeEmail: extractAssigneeEmail(body),
   };
 }

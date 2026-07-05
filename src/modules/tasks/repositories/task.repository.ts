@@ -11,6 +11,7 @@ export type TaskFilter = {
   priority?: TaskPriority;
   category?: TaskCategory;
   taskTypeId?: string;
+  sourceMailAccountId?: string;
   deadlineFrom?: Date;
   deadlineTo?: Date;
 };
@@ -29,6 +30,7 @@ export type CreateTaskInput = {
   deadline?: Date;
   externalRef?: string;
   externalSyncStatus?: string;
+  sourceMailAccountId?: string;
 };
 
 export type UpdateTaskInput = Partial<
@@ -45,6 +47,7 @@ function buildWhere(filter: TaskFilter): Prisma.TaskWhereInput {
     priority: filter.priority,
     category: filter.category,
     taskTypeId: filter.taskTypeId,
+    sourceMailAccountId: filter.sourceMailAccountId,
     deadline:
       filter.deadlineFrom || filter.deadlineTo
         ? { gte: filter.deadlineFrom, lte: filter.deadlineTo }

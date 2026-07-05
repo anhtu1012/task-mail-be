@@ -110,6 +110,11 @@ export class QueryTaskDto {
   @IsUUID()
   taskTypeId?: string;
 
+  @ApiPropertyOptional({ description: 'Lọc task theo hộp mail đã tạo ra nó' })
+  @IsOptional()
+  @IsUUID()
+  sourceMailAccountId?: string;
+
   @ApiPropertyOptional({ description: 'Chỉ ADMIN/SUPER_ADMIN mới được lọc theo người khác' })
   @IsOptional()
   @IsUUID()

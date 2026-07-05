@@ -56,19 +56,19 @@ model User {
 }
 
 model RefreshToken {
-  id                 String    @id @default(uuid())
-  userId             String    @map("user_id")
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
   // SHA-256 hash of the raw refresh token; the raw value only ever
   // lives in the HttpOnly cookie, never persisted.
-  tokenHash          String    @unique @map("token_hash")
-  expiresAt          DateTime  @map("expires_at")
-  revokedAt          DateTime? @map("revoked_at")
+  tokenHash         String    @unique @map("token_hash")
+  expiresAt         DateTime  @map("expires_at")
+  revokedAt         DateTime? @map("revoked_at")
   // Points at the token that replaced this one, so a rotation chain
   // can be audited/replayed if a reused (stolen) token is detected.
-  replacedByTokenId  String?   @map("replaced_by_token_id")
-  userAgent          String?   @map("user_agent")
-  ipAddress          String?   @map("ip_address")
-  createdAt          DateTime  @default(now()) @map("created_at")
+  replacedByTokenId String?   @map("replaced_by_token_id")
+  userAgent         String?   @map("user_agent")
+  ipAddress         String?   @map("ip_address")
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -123,9 +123,9 @@ model TaskType {
 }
 
 model Task {
-  id          String       @id @default(uuid())
+  id          String  @id @default(uuid())
   // Sequential number used to render a human-friendly code (e.g. TSK-000123).
-  seq         Int          @default(autoincrement())
+  seq         Int     @default(autoincrement())
   title       String
   description String?
   note        String?
@@ -149,6 +149,9 @@ model Task {
   externalSyncStatus String? @map("external_sync_status")
   externalRef        String? @map("external_ref")
 
+  // The connected mailbox (MailAccount) that ingested this task from an email, if any.
+  sourceMailAccountId String? @map("source_mail_account_id")
+
   // Set once a Zalo deadline reminder has fired, so the hourly cron never re-notifies.
   deadlineNotifiedAt DateTime? @map("deadline_notified_at")
 
@@ -156,13 +159,15 @@ model Task {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  taskType TaskType? @relation(fields: [taskTypeId], references: [id])
-  assignee User      @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  creator  User?     @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  taskType          TaskType?    @relation(fields: [taskTypeId], references: [id])
+  assignee          User         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator           User?        @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  sourceMailAccount MailAccount? @relation(fields: [sourceMailAccountId], references: [id], onDelete: SetNull)
 
   @@index([assigneeId])
   @@index([status])
   @@index([deadline])
+  @@index([sourceMailAccountId])
   @@map("tasks")
 }
 
@@ -182,7 +187,8 @@ model MailAccount {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks Task[]
 
   @@unique([userId, email])
   @@map("mail_accounts")

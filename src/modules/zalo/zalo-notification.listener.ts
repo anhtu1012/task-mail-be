@@ -43,9 +43,18 @@ export class ZaloNotificationListener {
 
   @OnEvent(TASK_CREATED_EVENT)
   async handleTaskCreated(task: TaskCreatedEvent): Promise<void> {
-    const account = await this.zaloAccountRepository.findByUserId(task.assigneeId);
-    if (!account) return;
-    await this.zaloBotService.sendTextMessage(account.zaloUserId, formatNewTaskMessage(task));
+    try {
+      const account = await this.zaloAccountRepository.findByUserId(task.assigneeId);
+      if (!account) {
+        this.logger.warn(
+          `Skipped Zalo notification for task ${task.id}: assignee ${task.assigneeId} has no linked Zalo account`,
+        );
+        return;
+      }
+      await this.zaloBotService.sendTextMessage(account.zaloUserId, formatNewTaskMessage(task));
+    } catch (error) {
+      this.logger.error(`Failed to send new-task Zalo notification for task ${task.id}`, error as Error);
+    }
   }
 
   @Cron(CronExpression.EVERY_HOUR)

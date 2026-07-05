@@ -66,4 +66,17 @@ describe('parseTaskMail', () => {
     const result = parseTaskMail('[TASK] Việc', 'không có link nào', '[TASK]');
     expect(result?.attachments).toEqual([]);
   });
+
+  it.each([
+    ['Giao cho: user@company.com', 'user@company.com'],
+    ['Gán cho: Manager@Company.com', 'manager@company.com'],
+    ['Assign to: other@company.com', 'other@company.com'],
+  ])('extracts the assignee email from %p', (body, expected) => {
+    expect(parseTaskMail('[TASK] Việc', body, '[TASK]')?.assigneeEmail).toBe(expected);
+  });
+
+  it('has no assignee email when there is no directive', () => {
+    const result = parseTaskMail('[TASK] Việc', 'không có chỉ định người nhận', '[TASK]');
+    expect(result?.assigneeEmail).toBeUndefined();
+  });
 });

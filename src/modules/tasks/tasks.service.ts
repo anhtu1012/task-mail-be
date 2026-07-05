@@ -37,6 +37,7 @@ export class TasksService {
       priority: query.priority,
       category: query.category,
       taskTypeId: query.taskTypeId,
+      sourceMailAccountId: query.sourceMailAccountId,
       deadlineFrom: query.from ? new Date(query.from) : undefined,
       deadlineTo: query.to ? new Date(query.to) : undefined,
     };
@@ -176,6 +177,7 @@ export class TasksService {
     assignedAt?: Date;
     externalRef: string;
     externalSyncStatus: string;
+    sourceMailAccountId?: string;
   }): Promise<TaskResponseDto> {
     const task = await this.taskRepository.create({
       title: input.title,
@@ -189,6 +191,7 @@ export class TasksService {
       deadline: input.deadline,
       externalRef: input.externalRef,
       externalSyncStatus: input.externalSyncStatus,
+      sourceMailAccountId: input.sourceMailAccountId,
     });
 
     this.emitTaskCreated(task);
@@ -254,6 +257,7 @@ export class TasksService {
       deadline: task.deadline,
       completedAt: task.completedAt,
       attachments: task.attachments,
+      sourceMailAccountId: task.sourceMailAccountId,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     };

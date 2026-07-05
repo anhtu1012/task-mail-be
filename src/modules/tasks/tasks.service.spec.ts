@@ -27,6 +27,7 @@ describe('TasksService', () => {
     completedAt: null,
     externalSyncStatus: null,
     externalRef: null,
+    sourceMailAccountId: null,
     deadlineNotifiedAt: null,
     tenantId: null,
     createdAt: new Date(),
