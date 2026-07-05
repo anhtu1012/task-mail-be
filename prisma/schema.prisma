@@ -1,0 +1,214 @@
+// Prisma schema for the Auth Module (PostgreSQL)
+// docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  // Null for accounts created via Google sign-in (no local password set).
+  passwordHash String?      @map("password_hash")
+  googleId     String?      @unique @map("google_id")
+  role         Role         @default(USER)
+  status       UserStatus   @default(ACTIVE)
+  provider     AuthProvider @default(LOCAL)
+  // Groundwork for multi-tenant support: nullable today, made required
+  // and indexed once tenant isolation is introduced.
+  tenantId     String?      @map("tenant_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  refreshTokens     RefreshToken[]
+  passwordResetOtps PasswordResetOtp[]
+  tasksAssigned     Task[]             @relation("TaskAssignee")
+  tasksCreated      Task[]             @relation("TaskCreator")
+  mailAccounts      MailAccount[]
+  zaloAccount       ZaloAccount?
+  zaloLinkCodes     ZaloLinkCode[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  // SHA-256 hash of the raw refresh token; the raw value only ever
+  // lives in the HttpOnly cookie, never persisted.
+  tokenHash          String    @unique @map("token_hash")
+  expiresAt          DateTime  @map("expires_at")
+  revokedAt          DateTime? @map("revoked_at")
+  // Points at the token that replaced this one, so a rotation chain
+  // can be audited/replayed if a reused (stolen) token is detected.
+  replacedByTokenId  String?   @map("replaced_by_token_id")
+  userAgent          String?   @map("user_agent")
+  ipAddress          String?   @map("ip_address")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetOtp {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  otpHash    String    @map("otp_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_otps")
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskCategory {
+  WORK
+  PERSONAL
+}
+
+model TaskType {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tasks Task[]
+
+  @@map("task_types")
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  // Sequential number used to render a human-friendly code (e.g. TSK-000123).
+  seq         Int          @default(autoincrement())
+  title       String
+  description String?
+  note        String?
+
+  taskTypeId String?      @map("task_type_id")
+  category   TaskCategory @default(WORK)
+  priority   TaskPriority @default(NORMAL)
+  status     TaskStatus   @default(TODO)
+
+  // Links or filenames found in the task source (e.g. attachments/links in the source mail).
+  attachments String[] @default([]) @map("attachments")
+
+  assigneeId String  @map("assignee_id")
+  creatorId  String? @map("creator_id")
+
+  assignedAt  DateTime? @map("assigned_at")
+  deadline    DateTime? @map("deadline")
+  completedAt DateTime? @map("completed_at")
+
+  // Groundwork for a future Lark (Feishu) sync integration; unused today.
+  externalSyncStatus String? @map("external_sync_status")
+  externalRef        String? @map("external_ref")
+
+  // Set once a Zalo deadline reminder has fired, so the hourly cron never re-notifies.
+  deadlineNotifiedAt DateTime? @map("deadline_notified_at")
+
+  tenantId  String?  @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  taskType TaskType? @relation(fields: [taskTypeId], references: [id])
+  assignee User      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator  User?     @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+
+  @@index([assigneeId])
+  @@index([status])
+  @@index([deadline])
+  @@map("tasks")
+}
+
+enum MailProvider {
+  GOOGLE
+}
+
+model MailAccount {
+  id             String       @id @default(uuid())
+  userId         String       @map("user_id")
+  provider       MailProvider @default(GOOGLE)
+  email          String
+  // AES-256-GCM ciphertext ("iv:authTag:cipherText" hex) — never stored as plaintext.
+  accessToken    String       @map("access_token")
+  refreshToken   String       @map("refresh_token")
+  tokenExpiresAt DateTime     @map("token_expires_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, email])
+  @@map("mail_accounts")
+}
+
+model ZaloAccount {
+  id         String   @id @default(uuid())
+  userId     String   @unique @map("user_id")
+  zaloUserId String   @unique @map("zalo_user_id")
+  linkedAt   DateTime @default(now()) @map("linked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("zalo_accounts")
+}
+
+// Short-lived code a user sends as a Zalo message to the bot to prove
+// ownership of that Zalo account and complete the link.
+model ZaloLinkCode {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  code      String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("zalo_link_codes")
+}
