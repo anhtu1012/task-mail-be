@@ -1,6 +1,6 @@
 # API Reference — nestjs-auth-cms
 
-Tài liệu này mô tả toàn bộ API backend để dựng frontend (React). Được tạo bằng cách quét trực tiếp source code (controllers, DTOs, guards, Prisma schema) — phản ánh đúng hành vi thực tế tại thời điểm viết (2026-07-04).
+Tài liệu này mô tả toàn bộ API backend để dựng frontend (React). Được tạo bằng cách quét trực tiếp source code (controllers, DTOs, guards, Prisma schema) — phản ánh đúng hành vi thực tế tại thời điểm viết (2026-07-08, cập nhật sau các migration thêm `category`/`attachments`/`sourceMailAccountId`).
 
 ## 1. Thông tin chung
 
@@ -53,8 +53,11 @@ Authorization: Bearer <accessToken>
 | `AuthProvider` | `LOCAL`, `GOOGLE` |
 | `TaskPriority` | `LOW`, `NORMAL` (default), `HIGH`, `URGENT` |
 | `TaskStatus` | `TODO` (default), `IN_PROGRESS`, `DONE`, `CANCELLED` |
+| `TaskCategory` | `WORK` (default), `PERSONAL` |
 | `MailProvider` | `GOOGLE` |
 | `deadlineStatus` (tính toán, không lưu DB) | `'IN_PROGRESS' \| 'ON_TIME' \| 'LATE'` |
+
+**Lưu ý**: dự án dùng **PostgreSQL qua Prisma** (không phải Mongoose/TypeORM). Không có global route prefix `/api` và **không có WebSocket/SSE** — mọi cảm giác "real-time" (nhắc deadline, thông báo task mới) được đẩy qua **Zalo Bot** cho người dùng đã liên kết Zalo, chứ không đẩy về FE. FE muốn cập nhật danh sách task theo thời gian thực thì tự polling `GET /tasks`.
 
 ---
 
@@ -127,7 +130,9 @@ Query (`QueryTaskDto`, tất cả optional):
 | `limit` | number | mặc định 20, tối đa 100 |
 | `status` | `TaskStatus` | |
 | `priority` | `TaskPriority` | |
+| `category` | `TaskCategory` | `WORK` \| `PERSONAL` |
 | `taskTypeId` | uuid | |
+| `sourceMailAccountId` | uuid | lọc riêng các task được tự tạo từ 1 mailbox Gmail cụ thể (xem mục 5b) |
 | `assigneeId` | uuid | chỉ có tác dụng với ADMIN/SUPER_ADMIN — user thường luôn bị ép về chính mình |
 | `from` | ISO date string | lọc `deadline >=` |
 | `to` | ISO date string | lọc `deadline <=` |
@@ -170,10 +175,12 @@ Body (`CreateTaskDto`):
 | `description` | string | ❌ | |
 | `note` | string | ❌ | |
 | `taskTypeId` | uuid | ❌ | |
+| `category` | `TaskCategory` | ❌ | mặc định `WORK` |
 | `priority` | `TaskPriority` | ❌ | mặc định `NORMAL` |
 | `assigneeId` | uuid | ❌ | mặc định là chính mình; chỉ admin được set người khác (nếu không → `403`) |
 | `assignedAt` | ISO date string | ❌ | |
 | `deadline` | ISO date string | ❌ | |
+| `attachments` | string[] | ❌ | danh sách URL/tên file (không phải upload thật, xem mục 8) |
 
 Response `201`: `TaskResponseDto`
 
@@ -209,6 +216,7 @@ Body (`UpdateTaskDto` = mọi field của `CreateTaskDto` là optional, cộng t
   description?: string | null;
   note?: string | null;
   taskTypeId?: string | null;
+  category: TaskCategory;
   priority: TaskPriority;
   status: TaskStatus;
   deadlineStatus: 'IN_PROGRESS' | 'ON_TIME' | 'LATE';  // tính toán
@@ -217,6 +225,8 @@ Body (`UpdateTaskDto` = mọi field của `CreateTaskDto` là optional, cộng t
   assignedAt?: string | null;   // Date ISO
   deadline?: string | null;
   completedAt?: string | null;
+  attachments: string[];
+  sourceMailAccountId?: string | null;  // != null nghĩa là task được tự tạo từ email (xem mục 5b)
   createdAt: string;
   updatedAt: string;
 }
@@ -251,6 +261,16 @@ Body (`UpdateTaskDto` = mọi field của `CreateTaskDto` là optional, cộng t
 - `GET /mail-accounts/google/callback` — Public, Google tự redirect vào đây, **không phải để FE gọi trực tiếp**. Trả về 1 trang HTML tĩnh báo thành công (không phải JSON) — dùng cho tab popup, không cần FE xử lý JSON response.
 - `DELETE /mail-accounts/:id` — Bearer required, chỉ chủ sở hữu hoặc admin → `204`
 
+### 5b. Tính năng tự tạo task từ email (chạy nền, **không có endpoint**)
+
+Sau khi user connect Gmail (mục 5), backend tự động:
+
+- Cứ mỗi 5 phút, quét các email mới trong mailbox có subject bắt đầu bằng `[TASK]` (đổi được qua env `MAIL_TASK_SUBJECT_PREFIX`), trong vòng 7 ngày gần nhất.
+- Parse nội dung email để suy ra: `title` (từ subject), `description` (nội dung email), `deadline` (regex tìm `deadline:` / `hạn: dd/mm/yyyy hh:mm`), `priority` (từ khoá "khẩn cấp"/"gấp" → `URGENT`, "cao" → `HIGH`), `attachments` (URL trong nội dung + tên file đính kèm Gmail thật), `assigneeId` (dòng `Giao cho:` / `Gán cho:` / `Assign to: <email>` trong nội dung — nếu email khớp user đã đăng ký thì gán cho họ, không thì gán cho chủ mailbox).
+- Chống trùng lặp qua `Message-ID` của email — mỗi email chỉ tạo 1 task duy nhất dù quét lại nhiều lần.
+- Task tạo ra xuất hiện bình thường trong `GET /tasks`, có `sourceMailAccountId` khác `null` để FE phân biệt (có thể hiển thị badge "Từ email" hoặc filter riêng bằng query `sourceMailAccountId`).
+- FE không cần gọi API gì thêm cho tính năng này — chỉ cần hiển thị task như task thường, và (tuỳ chọn) làm nổi bật task có `sourceMailAccountId`.
+
 ---
 
 ## 6. Module `zalo-accounts` (`/zalo-accounts`) — liên kết Zalo để nhận nhắc deadline
@@ -273,11 +293,18 @@ Body (`UpdateTaskDto` = mọi field của `CreateTaskDto` là optional, cộng t
   { connected: boolean; botName?: string }
   ```
 
+**Hành vi nền liên quan (không phải endpoint, chỉ để FE hiểu luồng)**:
+- Khi 1 task mới được tạo (kể cả từ email), nếu `assigneeId` đã liên kết Zalo → bot tự nhắn tin báo "có task mới" cho họ.
+- Mỗi giờ, bot quét các task sắp đến hạn (theo `deadline`, cửa sổ cấu hình qua env `TASK_DEADLINE_REMINDER_HOURS`) và nhắn nhắc — mỗi task chỉ nhắc 1 lần (đánh dấu nội bộ, không có field trả về ở `TaskResponseDto`).
+- Đây là kênh thông báo duy nhất hiện có — FE **không** cần/có thể tự implement push notification, và không có SSE/WebSocket nào để lắng nghe các sự kiện này từ trình duyệt.
+
 ---
 
 ## 8. Ghi chú cho FE
 
 - Không có endpoint quản lý user (`/users`) — thông tin user hiện tại chỉ lấy qua `GET /auth/me`.
-- Một số task trong `GET /tasks` có thể tự sinh ra từ email (Gmail ingestion chạy nền), không phải do user tạo qua UI — hiển thị bình thường như task khác, không cần xử lý gì đặc biệt.
+- Một số task trong `GET /tasks` có thể tự sinh ra từ email (Gmail ingestion chạy nền, xem mục 5b), không phải do user tạo qua UI — hiển thị bình thường như task khác, phân biệt qua field `sourceMailAccountId`.
+- **Không có tính năng upload file thật** — trường `attachments` của task chỉ là mảng string (URL hoặc tên file lấy được từ email), không có endpoint `multipart/form-data` nào để FE upload file lên server. Nếu cần đính kèm file thủ công, FE chỉ có thể nhập URL, không thể upload binary.
+- **Chưa có tính năng quên/đặt lại mật khẩu** dù trong DB đã có sẵn bảng `PasswordResetOtp` — bảng này chưa được nối với bất kỳ controller nào, nên FE **không nên** làm màn hình "Quên mật khẩu" cho tới khi backend bổ sung endpoint tương ứng.
 - Chiến lược lưu access token phía FE: lưu in-memory/state (Redux, Context, hoặc React Query cache) là đủ; khi access token hết hạn (`401`), gọi `POST /auth/refresh-token` (tự động nhờ cookie) để lấy token mới rồi retry request — pattern interceptor chuẩn của axios.
 - Do bật `forbidNonWhitelisted`, khi build form/payload gửi lên, chỉ gửi đúng các field được liệt kê ở trên — thừa field sẽ bị từ chối với `400`.
