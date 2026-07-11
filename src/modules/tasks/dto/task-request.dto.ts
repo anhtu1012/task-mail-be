@@ -18,7 +18,9 @@ export class CreateTaskDto {
   @IsString()
   title: string;
 
-  @ApiPropertyOptional({ description: 'Link tài liệu hoặc mô tả nhiệm vụ cần thực hiện' })
+  @ApiPropertyOptional({
+    description: 'Link tài liệu hoặc mô tả nhiệm vụ cần thực hiện',
+  })
   @IsOptional()
   @IsString()
   description?: string;
@@ -43,7 +45,9 @@ export class CreateTaskDto {
   @IsEnum(TaskPriority)
   priority?: TaskPriority;
 
-  @ApiPropertyOptional({ description: 'Chỉ ADMIN/SUPER_ADMIN mới được gán cho người khác' })
+  @ApiPropertyOptional({
+    description: 'Chỉ ADMIN/SUPER_ADMIN mới được gán cho người khác',
+  })
   @IsOptional()
   @IsUUID()
   assigneeId?: string;
@@ -58,7 +62,10 @@ export class CreateTaskDto {
   @IsDateString()
   deadline?: string;
 
-  @ApiPropertyOptional({ description: 'Link hoặc file đính kèm', type: [String] })
+  @ApiPropertyOptional({
+    description: 'Link hoặc file đính kèm',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -115,7 +122,9 @@ export class QueryTaskDto {
   @IsUUID()
   sourceMailAccountId?: string;
 
-  @ApiPropertyOptional({ description: 'Chỉ ADMIN/SUPER_ADMIN mới được lọc theo người khác' })
+  @ApiPropertyOptional({
+    description: 'Chỉ ADMIN/SUPER_ADMIN mới được lọc theo người khác',
+  })
   @IsOptional()
   @IsUUID()
   assigneeId?: string;
@@ -132,7 +141,9 @@ export class QueryTaskDto {
 }
 
 export class TaskStatsQueryDto {
-  @ApiPropertyOptional({ description: 'Chỉ ADMIN/SUPER_ADMIN mới được xem thống kê của người khác' })
+  @ApiPropertyOptional({
+    description: 'Chỉ ADMIN/SUPER_ADMIN mới được xem thống kê của người khác',
+  })
   @IsOptional()
   @IsUUID()
   assigneeId?: string;

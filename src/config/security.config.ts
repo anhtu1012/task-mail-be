@@ -4,9 +4,6 @@ export interface SecurityConfig {
   tokenEncryptionKey: string;
 }
 
-export default registerAs(
-  'security',
-  (): SecurityConfig => ({
-    tokenEncryptionKey: process.env.TOKEN_ENCRYPTION_KEY ?? '',
-  }),
-);
+export default registerAs('security', (): SecurityConfig => ({
+  tokenEncryptionKey: process.env.TOKEN_ENCRYPTION_KEY ?? '',
+}));

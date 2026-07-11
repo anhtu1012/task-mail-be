@@ -7,7 +7,9 @@ export class ZaloLinkCodeRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   create(userId: string, code: string, expiresAt: Date): Promise<ZaloLinkCode> {
-    return this.prisma.zaloLinkCode.create({ data: { userId, code, expiresAt } });
+    return this.prisma.zaloLinkCode.create({
+      data: { userId, code, expiresAt },
+    });
   }
 
   findByCode(code: string): Promise<ZaloLinkCode | null> {
@@ -19,6 +21,8 @@ export class ZaloLinkCodeRepository {
   }
 
   deleteExpired(): Promise<{ count: number }> {
-    return this.prisma.zaloLinkCode.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+    return this.prisma.zaloLinkCode.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    });
   }
 }

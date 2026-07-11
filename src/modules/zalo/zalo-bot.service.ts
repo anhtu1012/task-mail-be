@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ZaloConfig } from '../../config/zalo.config';
 import { ZaloLinkService } from './zalo-link.service';
@@ -37,12 +42,16 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
     private readonly zaloLinkService: ZaloLinkService,
   ) {
     const token = configService.get<ZaloConfig>('zalo')?.botToken;
-    this.baseUrl = token ? `https://bot-api.zaloplatforms.com/bot${token}` : undefined;
+    this.baseUrl = token
+      ? `https://bot-api.zaloplatforms.com/bot${token}`
+      : undefined;
   }
 
   onModuleInit(): void {
     if (!this.baseUrl) {
-      this.logger.warn('Zalo bot chưa cấu hình ZALO_BOT_TOKEN — bỏ qua polling');
+      this.logger.warn(
+        'Zalo bot chưa cấu hình ZALO_BOT_TOKEN — bỏ qua polling',
+      );
       return;
     }
     this.polling = true;
@@ -57,7 +66,9 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getMe(): Promise<{ id: string; account_name: string } | null> {
-    const result = await this.call<{ id: string; account_name: string }>('getMe');
+    const result = await this.call<{ id: string; account_name: string }>(
+      'getMe',
+    );
     return result ?? null;
   }
 
@@ -100,10 +111,12 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
     if (result && typeof result === 'object') {
       const obj = result as Record<string, unknown>;
       if (Array.isArray(obj.updates)) return obj.updates as ZaloUpdate[];
-      if ('message' in obj || 'event_name' in obj) return [obj as ZaloUpdate];
+      if ('message' in obj || 'event_name' in obj) return [obj];
     }
     if (result != null) {
-      this.logger.warn(`Dạng dữ liệu getUpdates không như dự kiến: ${JSON.stringify(result)}`);
+      this.logger.warn(
+        `Dạng dữ liệu getUpdates không như dự kiến: ${JSON.stringify(result)}`,
+      );
     }
     return [];
   }
@@ -116,8 +129,15 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
     this.markSeen(messageId);
 
     const chatId = message.chat?.id;
-    if (update.event_name === 'message.text.received' && chatId && typeof message.text === 'string') {
-      const linked = await this.zaloLinkService.confirmLink(message.text, chatId);
+    if (
+      update.event_name === 'message.text.received' &&
+      chatId &&
+      typeof message.text === 'string'
+    ) {
+      const linked = await this.zaloLinkService.confirmLink(
+        message.text,
+        chatId,
+      );
       if (linked) {
         await this.sendTextMessage(chatId, 'Liên kết tài khoản thành công!');
       }
@@ -127,7 +147,8 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
   private markSeen(messageId: string): void {
     this.seenMessageIds.add(messageId);
     if (this.seenMessageIds.size > MAX_SEEN_MESSAGE_IDS) {
-      const oldest = this.seenMessageIds.values().next().value;
+      const oldest = this.seenMessageIds.values().next().value as
+        string | undefined;
       if (oldest !== undefined) this.seenMessageIds.delete(oldest);
     }
   }
@@ -147,12 +168,15 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body ?? {}),
       });
+
       const data = (await response.json()) as ZaloApiResponse<T>;
       if (!data.ok) {
         if (data.description && benignErrors.includes(data.description)) {
           return [] as T;
         }
-        this.logger.error(`Zalo API ${method} thất bại: ${data.description ?? 'unknown error'}`);
+        this.logger.error(
+          `Zalo API ${method} thất bại: ${data.description ?? 'unknown error'}`,
+        );
         return undefined;
       }
       return data.result;

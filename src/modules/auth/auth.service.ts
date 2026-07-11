@@ -3,7 +3,10 @@ import { RegisterDto, LoginDto } from './dto/auth-request.dto';
 import { RegisterHandler } from './handlers/register.handler';
 import { LoginHandler } from './handlers/login.handler';
 import { LogoutHandler } from './handlers/logout.handler';
-import { RefreshTokenHandler, RefreshTokenInput } from './handlers/refresh-token.handler';
+import {
+  RefreshTokenHandler,
+  RefreshTokenInput,
+} from './handlers/refresh-token.handler';
 import { GoogleLoginHandler } from './handlers/google-login.handler';
 import { IssuedTokenPair, RequestMeta } from './services/token.service';
 import { UsersService } from '../users/users.service';
@@ -39,11 +42,17 @@ export class AuthService {
     return this.logoutHandler.execute(tokenId);
   }
 
-  refreshToken(input: RefreshTokenInput, meta: RequestMeta): Promise<IssuedTokenPair> {
+  refreshToken(
+    input: RefreshTokenInput,
+    meta: RequestMeta,
+  ): Promise<IssuedTokenPair> {
     return this.refreshTokenHandler.execute(input, meta);
   }
 
-  googleLogin(profile: GoogleProfile, meta: RequestMeta): Promise<IssuedTokenPair> {
+  googleLogin(
+    profile: GoogleProfile,
+    meta: RequestMeta,
+  ): Promise<IssuedTokenPair> {
     return this.googleLoginHandler.execute(profile, meta);
   }
 

@@ -5,10 +5,7 @@ export interface MailConfig {
   taskLookbackDays: number;
 }
 
-export default registerAs(
-  'mail',
-  (): MailConfig => ({
-    taskSubjectPrefix: process.env.MAIL_TASK_SUBJECT_PREFIX ?? '[TASK]',
-    taskLookbackDays: Number(process.env.MAIL_TASK_LOOKBACK_DAYS ?? 7),
-  }),
-);
+export default registerAs('mail', (): MailConfig => ({
+  taskSubjectPrefix: process.env.MAIL_TASK_SUBJECT_PREFIX ?? '[TASK]',
+  taskLookbackDays: Number(process.env.MAIL_TASK_LOOKBACK_DAYS ?? 7),
+}));

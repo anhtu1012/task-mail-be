@@ -1,15 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, StrategyOptions, VerifyCallback, Profile } from 'passport-google-oauth20';
+import {
+  Strategy,
+  StrategyOptions,
+  VerifyCallback,
+  Profile,
+} from 'passport-google-oauth20';
 import { AUTH_CONSTANTS } from '../../../common/constants/auth.constants';
 import { GoogleOAuthConfig } from '../../../config/google.config';
 import { GoogleProfile } from '../types/google-profile.type';
 
 @Injectable()
-export class GoogleStrategy extends PassportStrategy(Strategy, AUTH_CONSTANTS.GOOGLE_STRATEGY) {
+export class GoogleStrategy extends PassportStrategy(
+  Strategy,
+  AUTH_CONSTANTS.GOOGLE_STRATEGY,
+) {
   constructor(configService: ConfigService) {
-    const googleConfig = configService.getOrThrow<GoogleOAuthConfig>('googleOAuth');
+    const googleConfig =
+      configService.getOrThrow<GoogleOAuthConfig>('googleOAuth');
     const options: StrategyOptions = {
       clientID: googleConfig.clientId ?? '',
       clientSecret: googleConfig.clientSecret ?? '',

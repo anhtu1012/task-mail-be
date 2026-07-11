@@ -29,7 +29,10 @@ export class MailAccountRepository {
   }
 
   findByUser(userId: string): Promise<MailAccount[]> {
-    return this.prisma.mailAccount.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } });
+    return this.prisma.mailAccount.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   upsert(input: UpsertMailAccountInput): Promise<MailAccount> {

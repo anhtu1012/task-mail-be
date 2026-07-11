@@ -12,7 +12,9 @@ export class ZaloLinkService {
     private readonly zaloAccountRepository: ZaloAccountRepository,
   ) {}
 
-  async createLinkCode(userId: string): Promise<{ code: string; expiresAt: Date }> {
+  async createLinkCode(
+    userId: string,
+  ): Promise<{ code: string; expiresAt: Date }> {
     await this.zaloLinkCodeRepository.deleteExpired();
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const expiresAt = new Date(Date.now() + LINK_CODE_TTL_MS);

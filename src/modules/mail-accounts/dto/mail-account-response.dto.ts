@@ -16,6 +16,8 @@ export class MailAccountResponseDto {
 }
 
 export class ConnectUrlResponseDto {
-  @ApiProperty({ description: 'Mở URL này trong trình duyệt để đăng nhập và cấp quyền Gmail' })
+  @ApiProperty({
+    description: 'Mở URL này trong trình duyệt để đăng nhập và cấp quyền Gmail',
+  })
   url: string;
 }

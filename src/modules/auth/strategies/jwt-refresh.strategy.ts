@@ -7,8 +7,10 @@ import { AUTH_CONSTANTS } from '../../../common/constants/auth.constants';
 import { COOKIE_KEYS } from '../../../common/constants/cookie.constants';
 import { JwtRefreshPayload } from '../../../common/types/jwt-payload.type';
 
-const extractRefreshTokenFromCookie = (req: Request): string | null =>
-  req?.cookies?.[COOKIE_KEYS.REFRESH_TOKEN] ?? null;
+const extractRefreshTokenFromCookie = (req: Request): string | null => {
+  const cookies = req.cookies as Record<string, string | undefined> | undefined;
+  return cookies?.[COOKIE_KEYS.REFRESH_TOKEN] ?? null;
+};
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(
@@ -17,7 +19,9 @@ export class JwtRefreshStrategy extends PassportStrategy(
 ) {
   constructor(configService: ConfigService) {
     const options: StrategyOptionsWithRequest = {
-      jwtFromRequest: ExtractJwt.fromExtractors([extractRefreshTokenFromCookie]),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        extractRefreshTokenFromCookie,
+      ]),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('auth.refreshSecret'),
       passReqToCallback: true,
@@ -25,7 +29,10 @@ export class JwtRefreshStrategy extends PassportStrategy(
     super(options);
   }
 
-  validate(req: Request, payload: JwtRefreshPayload) {
+  validate(
+    req: Request,
+    payload: JwtRefreshPayload,
+  ): { sub: string; tokenId: string; refreshToken: string | null } {
     const refreshToken = extractRefreshTokenFromCookie(req);
     return { sub: payload.sub, tokenId: payload.tokenId, refreshToken };
   }

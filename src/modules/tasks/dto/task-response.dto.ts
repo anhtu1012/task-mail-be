@@ -54,7 +54,9 @@ export class TaskResponseDto {
   @ApiProperty({ description: 'Link hoặc file đính kèm', type: [String] })
   attachments: string[];
 
-  @ApiPropertyOptional({ description: 'Hộp mail đã tạo ra task này (nếu tạo tự động từ email)' })
+  @ApiPropertyOptional({
+    description: 'Hộp mail đã tạo ra task này (nếu tạo tự động từ email)',
+  })
   sourceMailAccountId?: string | null;
 
   @ApiProperty()

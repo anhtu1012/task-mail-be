@@ -1,8 +1,32 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
-import { CreateTaskDto, QueryTaskDto, TaskStatsQueryDto, UpdateTaskDto } from './dto/task-request.dto';
-import { PaginatedTaskResponseDto, TaskResponseDto } from './dto/task-response.dto';
+import {
+  CreateTaskDto,
+  QueryTaskDto,
+  TaskStatsQueryDto,
+  UpdateTaskDto,
+} from './dto/task-request.dto';
+import {
+  PaginatedTaskResponseDto,
+  TaskResponseDto,
+} from './dto/task-response.dto';
 import { TaskStatsResponseDto } from './dto/task-stats-response.dto';
 import { API_ROUTES } from '../../common/constants/api-routes.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -16,7 +40,9 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List tasks (own tasks for regular users, all for admins)' })
+  @ApiOperation({
+    summary: 'List tasks (own tasks for regular users, all for admins)',
+  })
   @ApiResponse({ status: HttpStatus.OK, type: PaginatedTaskResponseDto })
   list(
     @CurrentUser() user: RequestWithUser['user'],

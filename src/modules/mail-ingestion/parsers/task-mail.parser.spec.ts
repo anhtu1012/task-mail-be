@@ -3,11 +3,17 @@ import { TaskPriority } from '../../../common/enums/task-priority.enum';
 
 describe('parseTaskMail', () => {
   it('returns null when the subject has no task prefix', () => {
-    expect(parseTaskMail('Chào buổi sáng', 'nội dung bất kỳ', '[TASK]')).toBeNull();
+    expect(
+      parseTaskMail('Chào buổi sáng', 'nội dung bất kỳ', '[TASK]'),
+    ).toBeNull();
   });
 
   it('extracts the title with the prefix stripped', () => {
-    const result = parseTaskMail('[TASK] Chuẩn bị báo cáo tuần', 'nội dung', '[TASK]');
+    const result = parseTaskMail(
+      '[TASK] Chuẩn bị báo cáo tuần',
+      'nội dung',
+      '[TASK]',
+    );
     expect(result?.title).toBe('Chuẩn bị báo cáo tuần');
   });
 
@@ -31,7 +37,11 @@ describe('parseTaskMail', () => {
   });
 
   it('has no deadline when none is present', () => {
-    const result = parseTaskMail('[TASK] Việc', 'không có ngày nào ở đây', '[TASK]');
+    const result = parseTaskMail(
+      '[TASK] Việc',
+      'không có ngày nào ở đây',
+      '[TASK]',
+    );
     expect(result?.deadline).toBeUndefined();
   });
 
@@ -41,7 +51,9 @@ describe('parseTaskMail', () => {
     ['ưu tiên cao nhé', TaskPriority.HIGH],
     ['bình thường thôi', TaskPriority.NORMAL],
   ])('maps body %p to priority %p', (body, expected) => {
-    expect(parseTaskMail('[TASK] Việc', body, '[TASK]')?.priority).toBe(expected);
+    expect(parseTaskMail('[TASK] Việc', body, '[TASK]')?.priority).toBe(
+      expected,
+    );
   });
 
   it('truncates the description to 2000 characters', () => {
@@ -72,11 +84,17 @@ describe('parseTaskMail', () => {
     ['Gán cho: Manager@Company.com', 'manager@company.com'],
     ['Assign to: other@company.com', 'other@company.com'],
   ])('extracts the assignee email from %p', (body, expected) => {
-    expect(parseTaskMail('[TASK] Việc', body, '[TASK]')?.assigneeEmail).toBe(expected);
+    expect(parseTaskMail('[TASK] Việc', body, '[TASK]')?.assigneeEmail).toBe(
+      expected,
+    );
   });
 
   it('has no assignee email when there is no directive', () => {
-    const result = parseTaskMail('[TASK] Việc', 'không có chỉ định người nhận', '[TASK]');
+    const result = parseTaskMail(
+      '[TASK] Việc',
+      'không có chỉ định người nhận',
+      '[TASK]',
+    );
     expect(result?.assigneeEmail).toBeUndefined();
   });
 });

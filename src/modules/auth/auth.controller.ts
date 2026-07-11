@@ -28,7 +28,6 @@ import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CookieUtil } from '../../common/utils/cookie.util';
-import { DateUtil } from '../../common/utils/date.util';
 import { COOKIE_KEYS } from '../../common/constants/cookie.constants';
 import { API_ROUTES } from '../../common/constants/api-routes.constants';
 import type {
@@ -52,7 +51,10 @@ export class AuthController {
     return { userAgent: req.headers['user-agent'], ipAddress: req.ip };
   }
 
-  private setRefreshCookieAndRespond(res: Response, issued: IssuedTokenPair): AuthResponseDto {
+  private setRefreshCookieAndRespond(
+    res: Response,
+    issued: IssuedTokenPair,
+  ): AuthResponseDto {
     const cookieConfig = this.configService.getOrThrow<CookieConfig>('cookie');
     CookieUtil.setRefreshTokenCookie(
       res,
@@ -60,21 +62,30 @@ export class AuthController {
       cookieConfig,
       issued.refreshTokenExpiresAt.getTime() - Date.now(),
     );
-    return { accessToken: issued.accessToken, expiresIn: issued.accessTokenExpiresIn };
+    return {
+      accessToken: issued.accessToken,
+      expiresIn: issued.accessTokenExpiresIn,
+    };
   }
 
   @Public()
   @Post(API_ROUTES.AUTH.REGISTER)
   @ApiOperation({ summary: 'Register a new account' })
   @ApiResponse({ status: HttpStatus.CREATED, type: AuthResponseDto })
-  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Email already registered' })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Email already registered',
+  })
   @HttpCode(HttpStatus.CREATED)
   async register(
     @Body() dto: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    const issued = await this.authService.register(dto, this.getRequestMeta(req));
+    const issued = await this.authService.register(
+      dto,
+      this.getRequestMeta(req),
+    );
     return this.setRefreshCookieAndRespond(res, issued);
   }
 
@@ -82,7 +93,10 @@ export class AuthController {
   @Post(API_ROUTES.AUTH.LOGIN)
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: HttpStatus.OK, type: AuthResponseDto })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid credentials' })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Invalid credentials',
+  })
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
@@ -97,9 +111,14 @@ export class AuthController {
   @UseGuards(JwtRefreshGuard)
   @ApiCookieAuth(COOKIE_KEYS.REFRESH_TOKEN)
   @Post(API_ROUTES.AUTH.REFRESH_TOKEN)
-  @ApiOperation({ summary: 'Rotate the refresh token and issue a new access token' })
+  @ApiOperation({
+    summary: 'Rotate the refresh token and issue a new access token',
+  })
   @ApiResponse({ status: HttpStatus.OK, type: AuthResponseDto })
-  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Refresh token missing, expired, or reused' })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Refresh token missing, expired, or reused',
+  })
   @HttpCode(HttpStatus.OK)
   async refreshToken(
     @Req() req: RequestWithRefreshUser,
@@ -117,7 +136,9 @@ export class AuthController {
   @UseGuards(JwtRefreshGuard)
   @ApiCookieAuth(COOKIE_KEYS.REFRESH_TOKEN)
   @Post(API_ROUTES.AUTH.LOGOUT)
-  @ApiOperation({ summary: 'Revoke the current refresh token and clear the session cookie' })
+  @ApiOperation({
+    summary: 'Revoke the current refresh token and clear the session cookie',
+  })
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(
@@ -125,7 +146,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     await this.authService.logout(req.user.tokenId);
-    CookieUtil.clearRefreshTokenCookie(res, this.configService.getOrThrow<CookieConfig>('cookie'));
+    CookieUtil.clearRefreshTokenCookie(
+      res,
+      this.configService.getOrThrow<CookieConfig>('cookie'),
+    );
   }
 
   @ApiBearerAuth('access-token')
@@ -133,7 +157,9 @@ export class AuthController {
   @ApiOperation({ summary: 'Get the authenticated user profile' })
   @ApiResponse({ status: HttpStatus.OK, type: MeResponseDto })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED })
-  async me(@CurrentUser() user: RequestWithUser['user']): Promise<MeResponseDto> {
+  async me(
+    @CurrentUser() user: RequestWithUser['user'],
+  ): Promise<MeResponseDto> {
     const profile = await this.authService.getProfile(user.sub);
     return { id: profile.id, email: profile.email, role: profile.role };
   }
@@ -141,7 +167,9 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get(API_ROUTES.AUTH.GOOGLE)
-  @ApiOperation({ summary: 'Redirect to Google to start the sign-in/register flow' })
+  @ApiOperation({
+    summary: 'Redirect to Google to start the sign-in/register flow',
+  })
   googleLogin(): void {
     // Handled by GoogleAuthGuard, which redirects to Google's consent screen.
   }
@@ -149,18 +177,28 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get(API_ROUTES.AUTH.GOOGLE_CALLBACK)
-  @ApiOperation({ summary: 'Google OAuth callback: issues tokens and redirects to the frontend' })
+  @ApiOperation({
+    summary:
+      'Google OAuth callback: issues tokens and redirects to the frontend',
+  })
   async googleCallback(
     @Req() req: RequestWithGoogleUser,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    const issued = await this.authService.googleLogin(req.user, this.getRequestMeta(req));
+    const issued = await this.authService.googleLogin(
+      req.user,
+      this.getRequestMeta(req),
+    );
     this.setRefreshCookieAndRespond(res, issued);
 
-    const { frontendUrl } = this.configService.getOrThrow<GoogleOAuthConfig>('googleOAuth');
+    const { frontendUrl } =
+      this.configService.getOrThrow<GoogleOAuthConfig>('googleOAuth');
     const redirectUrl = new URL('/oauth-callback', frontendUrl);
     redirectUrl.searchParams.set('accessToken', issued.accessToken);
-    redirectUrl.searchParams.set('expiresIn', String(issued.accessTokenExpiresIn));
+    redirectUrl.searchParams.set(
+      'expiresIn',
+      String(issued.accessTokenExpiresIn),
+    );
     res.redirect(redirectUrl.toString());
   }
 }

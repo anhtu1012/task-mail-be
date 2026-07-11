@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import type { Task } from '../../../generated/prisma/client';
-import { TaskCategory, TaskPriority, TaskStatus } from '../../../generated/prisma/enums';
+import {
+  TaskCategory,
+  TaskPriority,
+  TaskStatus,
+} from '../../../generated/prisma/enums';
 import { PaginationParams } from '../../../common/types/pagination.type';
 
 export type TaskFilter = {
@@ -108,7 +112,10 @@ export class TaskRepository {
 
   // Prisma has no field-to-field comparison in `where`, so on-time completions
   // are computed in memory from the (small) set of completed tasks in scope.
-  async countOnTimeCompleted(assigneeId: string, since?: Date): Promise<number> {
+  async countOnTimeCompleted(
+    assigneeId: string,
+    since?: Date,
+  ): Promise<number> {
     const completed = await this.prisma.task.findMany({
       where: {
         assigneeId,
@@ -117,8 +124,9 @@ export class TaskRepository {
       },
       select: { deadline: true, completedAt: true },
     });
-    return completed.filter((t) => !t.deadline || !t.completedAt || t.completedAt <= t.deadline)
-      .length;
+    return completed.filter(
+      (t) => !t.deadline || !t.completedAt || t.completedAt <= t.deadline,
+    ).length;
   }
 
   findApproachingDeadline(hours: number): Promise<Task[]> {
@@ -134,6 +142,9 @@ export class TaskRepository {
   }
 
   markDeadlineNotified(id: string): Promise<Task> {
-    return this.prisma.task.update({ where: { id }, data: { deadlineNotifiedAt: new Date() } });
+    return this.prisma.task.update({
+      where: { id },
+      data: { deadlineNotifiedAt: new Date() },
+    });
   }
 }

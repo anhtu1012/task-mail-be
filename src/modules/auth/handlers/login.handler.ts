@@ -5,7 +5,11 @@ import { UserStatus } from '../../../common/enums/status.enum';
 import { UnauthorizedException } from '../../../common/exceptions/unauthorized.exception';
 import { ERROR_CODES } from '../../../common/constants/error-codes.constants';
 import { LoginDto } from '../dto/auth-request.dto';
-import { TokenService, IssuedTokenPair, RequestMeta } from '../services/token.service';
+import {
+  TokenService,
+  IssuedTokenPair,
+  RequestMeta,
+} from '../services/token.service';
 
 @Injectable()
 export class LoginHandler {
@@ -17,7 +21,10 @@ export class LoginHandler {
   async execute(dto: LoginDto, meta: RequestMeta): Promise<IssuedTokenPair> {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password', ERROR_CODES.INVALID_CREDENTIALS);
+      throw new UnauthorizedException(
+        'Invalid email or password',
+        ERROR_CODES.INVALID_CREDENTIALS,
+      );
     }
 
     if (!user.passwordHash) {
@@ -27,13 +34,22 @@ export class LoginHandler {
       );
     }
 
-    const passwordMatches = await HashUtil.compare(dto.password, user.passwordHash);
+    const passwordMatches = await HashUtil.compare(
+      dto.password,
+      user.passwordHash,
+    );
     if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid email or password', ERROR_CODES.INVALID_CREDENTIALS);
+      throw new UnauthorizedException(
+        'Invalid email or password',
+        ERROR_CODES.INVALID_CREDENTIALS,
+      );
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Account is not active', ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+      throw new UnauthorizedException(
+        'Account is not active',
+        ERROR_CODES.ACCOUNT_NOT_ACTIVE,
+      );
     }
 
     return this.tokenService.issueTokenPair(

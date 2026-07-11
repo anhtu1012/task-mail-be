@@ -40,6 +40,9 @@ export class UserRepository {
   }
 
   linkGoogleId(userId: string, googleId: string): Promise<User> {
-    return this.prisma.user.update({ where: { id: userId }, data: { googleId } });
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { googleId },
+    });
   }
 }

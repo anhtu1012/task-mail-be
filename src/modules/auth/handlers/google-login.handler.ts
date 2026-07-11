@@ -6,7 +6,11 @@ import { UnauthorizedException } from '../../../common/exceptions/unauthorized.e
 import { BusinessException } from '../../../common/exceptions/business.exception';
 import { ERROR_CODES } from '../../../common/constants/error-codes.constants';
 import { GoogleProfile } from '../types/google-profile.type';
-import { TokenService, IssuedTokenPair, RequestMeta } from '../services/token.service';
+import {
+  TokenService,
+  IssuedTokenPair,
+  RequestMeta,
+} from '../services/token.service';
 
 @Injectable()
 export class GoogleLoginHandler {
@@ -15,7 +19,10 @@ export class GoogleLoginHandler {
     private readonly tokenService: TokenService,
   ) {}
 
-  async execute(profile: GoogleProfile, meta: RequestMeta): Promise<IssuedTokenPair> {
+  async execute(
+    profile: GoogleProfile,
+    meta: RequestMeta,
+  ): Promise<IssuedTokenPair> {
     if (!profile.email) {
       throw new BusinessException(
         'Google account has no verified email',
@@ -27,9 +34,14 @@ export class GoogleLoginHandler {
     let user = await this.usersService.findByGoogleId(profile.googleId);
 
     if (!user) {
-      const existingByEmail = await this.usersService.findByEmail(profile.email);
+      const existingByEmail = await this.usersService.findByEmail(
+        profile.email,
+      );
       user = existingByEmail
-        ? await this.usersService.linkGoogleId(existingByEmail.id, profile.googleId)
+        ? await this.usersService.linkGoogleId(
+            existingByEmail.id,
+            profile.googleId,
+          )
         : await this.usersService.create({
             email: profile.email,
             googleId: profile.googleId,
@@ -38,7 +50,10 @@ export class GoogleLoginHandler {
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Account is not active', ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+      throw new UnauthorizedException(
+        'Account is not active',
+        ERROR_CODES.ACCOUNT_NOT_ACTIVE,
+      );
     }
 
     return this.tokenService.issueTokenPair(

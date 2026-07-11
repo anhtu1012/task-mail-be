@@ -20,7 +20,8 @@ const OAUTH_SCOPES = [
 ];
 
 const STATE_TOKEN_TTL = '5m';
-const isPrivileged = (role: Role) => role === Role.ADMIN || role === Role.SUPER_ADMIN;
+const isPrivileged = (role: Role) =>
+  role === Role.ADMIN || role === Role.SUPER_ADMIN;
 
 @Injectable()
 export class MailAccountsService {
@@ -32,13 +33,20 @@ export class MailAccountsService {
 
   buildOAuthClient() {
     const config = this.configService.get<GoogleOAuthConfig>('googleOAuth');
-    return new google.auth.OAuth2(config?.clientId, config?.clientSecret, config?.redirectUri);
+    return new google.auth.OAuth2(
+      config?.clientId,
+      config?.clientSecret,
+      config?.redirectUri,
+    );
   }
 
   getConnectUrl(userId: string): string {
     const state = this.jwtService.sign(
       { sub: userId, purpose: 'mail-connect' },
-      { secret: this.configService.getOrThrow<string>('auth.accessSecret'), expiresIn: STATE_TOKEN_TTL },
+      {
+        secret: this.configService.getOrThrow<string>('auth.accessSecret'),
+        expiresIn: STATE_TOKEN_TTL,
+      },
     );
 
     return this.buildOAuthClient().generateAuthUrl({
@@ -55,13 +63,19 @@ export class MailAccountsService {
     const client = this.buildOAuthClient();
     const { tokens } = await client.getToken(code);
     if (!tokens.access_token || !tokens.refresh_token) {
-      throw new UnauthorizedException('Google did not return the expected OAuth tokens');
+      throw new UnauthorizedException(
+        'Google did not return the expected OAuth tokens',
+      );
     }
     client.setCredentials(tokens);
 
-    const { data } = await google.oauth2({ version: 'v2', auth: client }).userinfo.get();
+    const { data } = await google
+      .oauth2({ version: 'v2', auth: client })
+      .userinfo.get();
     if (!data.email) {
-      throw new UnauthorizedException('Could not determine the connected Gmail address');
+      throw new UnauthorizedException(
+        'Could not determine the connected Gmail address',
+      );
     }
 
     const key = this.getEncryptionKey();
@@ -83,17 +97,23 @@ export class MailAccountsService {
     const account = await this.mailAccountRepository.findById(id);
     if (!account) throw new NotFoundException('Mail account not found');
     if (account.userId !== user.sub && !isPrivileged(user.role)) {
-      throw new ForbiddenException('You do not have access to this mail account');
+      throw new ForbiddenException(
+        'You do not have access to this mail account',
+      );
     }
     await this.mailAccountRepository.delete(id);
   }
 
   private verifyState(state: string): string {
     try {
-      const payload = this.jwtService.verify<{ sub: string; purpose: string }>(state, {
-        secret: this.configService.getOrThrow<string>('auth.accessSecret'),
-      });
-      if (payload.purpose !== 'mail-connect') throw new Error('Wrong token purpose');
+      const payload = this.jwtService.verify<{ sub: string; purpose: string }>(
+        state,
+        {
+          secret: this.configService.getOrThrow<string>('auth.accessSecret'),
+        },
+      );
+      if (payload.purpose !== 'mail-connect')
+        throw new Error('Wrong token purpose');
       return payload.sub;
     } catch {
       throw new UnauthorizedException('Invalid or expired connect link');
@@ -101,7 +121,8 @@ export class MailAccountsService {
   }
 
   private getEncryptionKey(): string {
-    return this.configService.getOrThrow<SecurityConfig>('security').tokenEncryptionKey;
+    return this.configService.getOrThrow<SecurityConfig>('security')
+      .tokenEncryptionKey;
   }
 
   private toResponse(account: MailAccount): MailAccountResponseDto {

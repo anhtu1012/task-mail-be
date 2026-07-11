@@ -10,12 +10,18 @@ import { PaginationUtil } from '../../common/utils/pagination.util';
 import { NotFoundException } from '../../common/exceptions/not-found.exception';
 import { ForbiddenException } from '../../common/exceptions/forbidden.exception';
 import { TaskRepository } from './repositories/task.repository';
-import { CreateTaskDto, QueryTaskDto, TaskStatsQueryDto, UpdateTaskDto } from './dto/task-request.dto';
+import {
+  CreateTaskDto,
+  QueryTaskDto,
+  TaskStatsQueryDto,
+  UpdateTaskDto,
+} from './dto/task-request.dto';
 import { DeadlineStatus, TaskResponseDto } from './dto/task-response.dto';
 import { TaskStatsResponseDto } from './dto/task-stats-response.dto';
 import { TASK_CREATED_EVENT } from './events/task-created.event';
 
-const isPrivileged = (role: Role) => role === Role.ADMIN || role === Role.SUPER_ADMIN;
+const isPrivileged = (role: Role) =>
+  role === Role.ADMIN || role === Role.SUPER_ADMIN;
 
 @Injectable()
 export class TasksService {
@@ -27,7 +33,12 @@ export class TasksService {
   async list(
     user: JwtAccessPayload,
     query: QueryTaskDto,
-  ): Promise<{ items: TaskResponseDto[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    items: TaskResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const pagination = PaginationUtil.normalize(query.page, query.limit);
     const assigneeId = isPrivileged(user.role) ? query.assigneeId : user.sub;
 
@@ -61,10 +72,15 @@ export class TasksService {
     return this.toResponse(task);
   }
 
-  async create(user: JwtAccessPayload, dto: CreateTaskDto): Promise<TaskResponseDto> {
+  async create(
+    user: JwtAccessPayload,
+    dto: CreateTaskDto,
+  ): Promise<TaskResponseDto> {
     const assigneeId = dto.assigneeId ?? user.sub;
     if (assigneeId !== user.sub && !isPrivileged(user.role)) {
-      throw new ForbiddenException('Only admins can assign tasks to other users');
+      throw new ForbiddenException(
+        'Only admins can assign tasks to other users',
+      );
     }
 
     const task = await this.taskRepository.create({
@@ -85,15 +101,24 @@ export class TasksService {
     return this.toResponse(task);
   }
 
-  async update(user: JwtAccessPayload, id: string, dto: UpdateTaskDto): Promise<TaskResponseDto> {
+  async update(
+    user: JwtAccessPayload,
+    id: string,
+    dto: UpdateTaskDto,
+  ): Promise<TaskResponseDto> {
     const task = await this.findOrThrow(id);
     this.assertCanAccess(task, user);
 
-    if (dto.assigneeId && dto.assigneeId !== task.assigneeId && !isPrivileged(user.role)) {
+    if (
+      dto.assigneeId &&
+      dto.assigneeId !== task.assigneeId &&
+      !isPrivileged(user.role)
+    ) {
       throw new ForbiddenException('Only admins can reassign tasks');
     }
 
-    const completingNow = dto.status === TaskStatus.DONE && !task.completedAt && !dto.completedAt;
+    const completingNow =
+      dto.status === TaskStatus.DONE && !task.completedAt && !dto.completedAt;
 
     const updated = await this.taskRepository.update(id, {
       title: dto.title,
@@ -106,7 +131,11 @@ export class TasksService {
       assignedAt: dto.assignedAt ? new Date(dto.assignedAt) : undefined,
       deadline: dto.deadline ? new Date(dto.deadline) : undefined,
       status: dto.status,
-      completedAt: completingNow ? new Date() : dto.completedAt ? new Date(dto.completedAt) : undefined,
+      completedAt: completingNow
+        ? new Date()
+        : dto.completedAt
+          ? new Date(dto.completedAt)
+          : undefined,
     });
 
     return this.toResponse(updated);
@@ -130,34 +159,51 @@ export class TasksService {
     await this.taskRepository.delete(id);
   }
 
-  async getStats(user: JwtAccessPayload, query: TaskStatsQueryDto): Promise<TaskStatsResponseDto> {
-    const assigneeId = isPrivileged(user.role) && query.assigneeId ? query.assigneeId : user.sub;
+  async getStats(
+    user: JwtAccessPayload,
+    query: TaskStatsQueryDto,
+  ): Promise<TaskStatsResponseDto> {
+    const assigneeId =
+      isPrivileged(user.role) && query.assigneeId ? query.assigneeId : user.sub;
 
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
-    const [total, totalCompleted, completedInMonth, onTimeCompleted, onTimeCompletedInMonth] =
-      await Promise.all([
-        this.taskRepository.countTotal(assigneeId),
-        this.taskRepository.countCompleted(assigneeId),
-        this.taskRepository.countCompleted(assigneeId, monthStart),
-        this.taskRepository.countOnTimeCompleted(assigneeId),
-        this.taskRepository.countOnTimeCompleted(assigneeId, monthStart),
-      ]);
+    const [
+      total,
+      totalCompleted,
+      completedInMonth,
+      onTimeCompleted,
+      onTimeCompletedInMonth,
+    ] = await Promise.all([
+      this.taskRepository.countTotal(assigneeId),
+      this.taskRepository.countCompleted(assigneeId),
+      this.taskRepository.countCompleted(assigneeId, monthStart),
+      this.taskRepository.countOnTimeCompleted(assigneeId),
+      this.taskRepository.countOnTimeCompleted(assigneeId, monthStart),
+    ]);
 
     return {
       totalCompleted,
       completedInMonth,
-      completionRate: total > 0 ? Math.round((totalCompleted / total) * 100) : 0,
-      performance: totalCompleted > 0 ? Math.round((onTimeCompleted / totalCompleted) * 100) : 0,
+      completionRate:
+        total > 0 ? Math.round((totalCompleted / total) * 100) : 0,
+      performance:
+        totalCompleted > 0
+          ? Math.round((onTimeCompleted / totalCompleted) * 100)
+          : 0,
       performanceMonth:
-        completedInMonth > 0 ? Math.round((onTimeCompletedInMonth / completedInMonth) * 100) : 0,
+        completedInMonth > 0
+          ? Math.round((onTimeCompletedInMonth / completedInMonth) * 100)
+          : 0,
     };
   }
 
   /** Looks up a task created from an external source (e.g. mail ingestion) by its dedup key. */
-  async findByExternalRef(externalRef: string): Promise<TaskResponseDto | null> {
+  async findByExternalRef(
+    externalRef: string,
+  ): Promise<TaskResponseDto | null> {
     const task = await this.taskRepository.findByExternalRef(externalRef);
     return task ? this.toResponse(task) : null;
   }
@@ -232,7 +278,12 @@ export class TasksService {
 
   private computeDeadlineStatus(task: Task): DeadlineStatus {
     if (task.status === TaskStatus.DONE) {
-      if (!task.deadline || !task.completedAt || task.completedAt <= task.deadline) return 'ON_TIME';
+      if (
+        !task.deadline ||
+        !task.completedAt ||
+        task.completedAt <= task.deadline
+      )
+        return 'ON_TIME';
       return 'LATE';
     }
     if (task.deadline && task.deadline.getTime() < Date.now()) return 'LATE';

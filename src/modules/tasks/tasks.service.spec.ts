@@ -51,7 +51,11 @@ describe('TasksService', () => {
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       TASK_CREATED_EVENT,
-      expect.objectContaining({ id: 'task-1', assigneeId: 'user-1', title: 'Việc cần làm' }),
+      expect.objectContaining({
+        id: 'task-1',
+        assigneeId: 'user-1',
+        title: 'Việc cần làm',
+      }),
     );
   });
 
@@ -82,7 +86,10 @@ describe('TasksService', () => {
     });
 
     expect(taskRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'WORK', assignedAt: expect.any(Date) }),
+      expect.objectContaining({
+        category: 'WORK',
+        assignedAt: expect.any(Date),
+      }),
     );
   });
 

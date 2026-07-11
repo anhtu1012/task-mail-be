@@ -1,4 +1,10 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import {
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  NestInterceptor,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { Observable, of, tap } from 'rxjs';
 import { CACHE_TTL } from '../constants/cache.constants';
 
@@ -8,10 +14,13 @@ import { CACHE_TTL } from '../constants/cache.constants';
  */
 @Injectable()
 export class CacheInterceptor implements NestInterceptor {
-  private readonly store = new Map<string, { value: unknown; expiresAt: number }>();
+  private readonly store = new Map<
+    string,
+    { value: unknown; expiresAt: number }
+  >();
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request>();
     if (request.method !== 'GET') return next.handle();
 
     const key = request.originalUrl;

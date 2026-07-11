@@ -32,4 +32,14 @@ export default tseslint.config(
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },
+  {
+    files: ['**/*.spec.ts'],
+    rules: {
+      // Jest mocks (`expect(obj.method).toHaveBeenCalledWith(...)`) read a method
+      // reference without calling it, which this rule always flags as unsafe.
+      '@typescript-eslint/unbound-method': 'off',
+      // Jest matchers like `expect.any(Date)` are typed `any` by @types/jest.
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+    },
+  },
 );

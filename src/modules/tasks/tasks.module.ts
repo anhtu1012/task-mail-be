@@ -8,7 +8,12 @@ import { TaskTypeRepository } from './repositories/task-type.repository';
 
 @Module({
   controllers: [TasksController, TaskTypesController],
-  providers: [TasksService, TaskRepository, TaskTypesService, TaskTypeRepository],
+  providers: [
+    TasksService,
+    TaskRepository,
+    TaskTypesService,
+    TaskTypeRepository,
+  ],
   exports: [TasksService],
 })
 export class TasksModule {}

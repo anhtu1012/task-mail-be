@@ -39,7 +39,9 @@ export class TokenService {
       { sub: user.id, email: user.email, role: user.role },
       {
         secret: this.configService.getOrThrow<string>('auth.accessSecret'),
-        expiresIn: this.configService.getOrThrow<string>('auth.accessExpiresIn'),
+        expiresIn: this.configService.getOrThrow<string>(
+          'auth.accessExpiresIn',
+        ),
       } as JwtSignOptions,
     );
   }
@@ -49,21 +51,23 @@ export class TokenService {
    * id becomes the refresh JWT's `tokenId` claim — the DB row is the source
    * of truth for revocation, the JWT is just a signed pointer to it.
    */
-  async issueTokenPair(user: TokenSubject, meta: RequestMeta = {}): Promise<IssuedTokenPair> {
+  async issueTokenPair(
+    user: TokenSubject,
+    meta: RequestMeta = {},
+  ): Promise<IssuedTokenPair> {
     const tokenId = randomUUID();
-    const refreshExpiresIn = this.configService.getOrThrow<string>('auth.refreshExpiresIn');
+    const refreshExpiresIn = this.configService.getOrThrow<string>(
+      'auth.refreshExpiresIn',
+    );
     const refreshTokenExpiresAt = DateUtil.addMs(
       new Date(),
       DateUtil.parseDurationToMs(refreshExpiresIn),
     );
 
-    const refreshToken = this.jwtService.sign(
-      { sub: user.id, tokenId },
-      {
-        secret: this.configService.getOrThrow<string>('auth.refreshSecret'),
-        expiresIn: refreshExpiresIn,
-      } as JwtSignOptions,
-    );
+    const refreshToken = this.jwtService.sign({ sub: user.id, tokenId }, {
+      secret: this.configService.getOrThrow<string>('auth.refreshSecret'),
+      expiresIn: refreshExpiresIn,
+    } as JwtSignOptions);
 
     await this.refreshTokenRepository.create({
       id: tokenId,

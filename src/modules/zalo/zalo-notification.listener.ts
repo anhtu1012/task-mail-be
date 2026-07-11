@@ -44,32 +44,49 @@ export class ZaloNotificationListener {
   @OnEvent(TASK_CREATED_EVENT)
   async handleTaskCreated(task: TaskCreatedEvent): Promise<void> {
     try {
-      const account = await this.zaloAccountRepository.findByUserId(task.assigneeId);
+      const account = await this.zaloAccountRepository.findByUserId(
+        task.assigneeId,
+      );
       if (!account) {
         this.logger.warn(
           `Skipped Zalo notification for task ${task.id}: assignee ${task.assigneeId} has no linked Zalo account`,
         );
         return;
       }
-      await this.zaloBotService.sendTextMessage(account.zaloUserId, formatNewTaskMessage(task));
+      await this.zaloBotService.sendTextMessage(
+        account.zaloUserId,
+        formatNewTaskMessage(task),
+      );
     } catch (error) {
-      this.logger.error(`Failed to send new-task Zalo notification for task ${task.id}`, error as Error);
+      this.logger.error(
+        `Failed to send new-task Zalo notification for task ${task.id}`,
+        error as Error,
+      );
     }
   }
 
   @Cron(CronExpression.EVERY_HOUR)
   async remindApproachingDeadlines(): Promise<void> {
-    const hours = this.configService.getOrThrow<ZaloConfig>('zalo').deadlineReminderHours;
+    const hours =
+      this.configService.getOrThrow<ZaloConfig>('zalo').deadlineReminderHours;
     const dueTasks = await this.tasksService.findApproachingDeadline(hours);
 
     for (const task of dueTasks) {
       try {
-        const account = await this.zaloAccountRepository.findByUserId(task.assigneeId);
+        const account = await this.zaloAccountRepository.findByUserId(
+          task.assigneeId,
+        );
         if (account) {
-          await this.zaloBotService.sendTextMessage(account.zaloUserId, formatDeadlineMessage(task));
+          await this.zaloBotService.sendTextMessage(
+            account.zaloUserId,
+            formatDeadlineMessage(task),
+          );
         }
       } catch (error) {
-        this.logger.error(`Failed to send deadline reminder for task ${task.id}`, error as Error);
+        this.logger.error(
+          `Failed to send deadline reminder for task ${task.id}`,
+          error as Error,
+        );
       } finally {
         // Mark notified even on send failure — avoids retry-storming a task whose
         // recipient's link is broken; the reminder is inherently best-effort.

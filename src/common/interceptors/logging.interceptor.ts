@@ -17,10 +17,12 @@ export class LoggingInterceptor implements NestInterceptor {
     const { method, originalUrl } = request;
     const start = Date.now();
 
-    return next.handle().pipe(
-      tap(() =>
-        this.logger.log(`${method} ${originalUrl} +${Date.now() - start}ms`),
-      ),
-    );
+    return next
+      .handle()
+      .pipe(
+        tap(() =>
+          this.logger.log(`${method} ${originalUrl} +${Date.now() - start}ms`),
+        ),
+      );
   }
 }

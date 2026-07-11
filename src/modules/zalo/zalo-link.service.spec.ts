@@ -13,7 +13,10 @@ describe('ZaloLinkService', () => {
     const zaloAccountRepository = {
       upsert: jest.fn().mockResolvedValue(undefined),
     } as unknown as ZaloAccountRepository;
-    const service = new ZaloLinkService(zaloLinkCodeRepository, zaloAccountRepository);
+    const service = new ZaloLinkService(
+      zaloLinkCodeRepository,
+      zaloAccountRepository,
+    );
     return { service, zaloLinkCodeRepository, zaloAccountRepository };
   }
 
@@ -24,7 +27,9 @@ describe('ZaloLinkService', () => {
 
     expect(code).toMatch(/^\d{6}$/);
     expect(expiresAt.getTime()).toBeGreaterThan(before + 9 * 60 * 1000);
-    expect(expiresAt.getTime()).toBeLessThanOrEqual(before + 10 * 60 * 1000 + 1000);
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(
+      before + 10 * 60 * 1000 + 1000,
+    );
   });
 
   it('links the account when the code is valid and unexpired', async () => {
@@ -39,7 +44,10 @@ describe('ZaloLinkService', () => {
     const result = await service.confirmLink('123456', 'zalo-user-1');
 
     expect(result).toBe(true);
-    expect(zaloAccountRepository.upsert).toHaveBeenCalledWith('user-1', 'zalo-user-1');
+    expect(zaloAccountRepository.upsert).toHaveBeenCalledWith(
+      'user-1',
+      'zalo-user-1',
+    );
     expect(zaloLinkCodeRepository.delete).toHaveBeenCalledWith('code-1');
   });
 

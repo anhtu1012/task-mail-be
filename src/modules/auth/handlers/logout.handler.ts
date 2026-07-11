@@ -3,7 +3,9 @@ import { RefreshTokenRepository } from '../repositories/refresh-token.repository
 
 @Injectable()
 export class LogoutHandler {
-  constructor(private readonly refreshTokenRepository: RefreshTokenRepository) {}
+  constructor(
+    private readonly refreshTokenRepository: RefreshTokenRepository,
+  ) {}
 
   async execute(tokenId: string): Promise<void> {
     const token = await this.refreshTokenRepository.findById(tokenId);

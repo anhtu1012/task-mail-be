@@ -13,7 +13,9 @@ describe('EncryptionUtil', () => {
 
   it('produces a different ciphertext each time (random IV)', () => {
     const plain = 'same input';
-    expect(EncryptionUtil.encrypt(plain, key)).not.toBe(EncryptionUtil.encrypt(plain, key));
+    expect(EncryptionUtil.encrypt(plain, key)).not.toBe(
+      EncryptionUtil.encrypt(plain, key),
+    );
   });
 
   it('throws when decrypting with the wrong key', () => {

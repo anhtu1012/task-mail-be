@@ -17,7 +17,8 @@ const URL_REGEX = /https?:\/\/[^\s<>"']+/gi;
 // Explicit "Giao cho: <email>" / "Gán cho: <email>" / "Assign to: <email>" directive
 // in the body names the intended assignee, so the task lands on the right person
 // even when the mail was received in a different (e.g. CC'd) connected mailbox.
-const ASSIGNEE_REGEX = /(?:giao\s*cho|g[aá]n\s*cho|assign(?:ed)?\s*to)\s*:\s*([^\s,;<>]+@[^\s,;<>]+)/i;
+const ASSIGNEE_REGEX =
+  /(?:giao\s*cho|g[aá]n\s*cho|assign(?:ed)?\s*to)\s*:\s*([^\s,;<>]+@[^\s,;<>]+)/i;
 
 const MAX_DESCRIPTION_LENGTH = 2000;
 
@@ -38,7 +39,8 @@ function extractDeadline(bodyText: string): Date | undefined {
 
 function extractPriority(bodyText: string): TaskPriority {
   const text = bodyText.toLowerCase();
-  if (text.includes('khẩn cấp') || text.includes('gấp')) return TaskPriority.URGENT;
+  if (text.includes('khẩn cấp') || text.includes('gấp'))
+    return TaskPriority.URGENT;
   if (text.includes('cao')) return TaskPriority.HIGH;
   return TaskPriority.NORMAL;
 }

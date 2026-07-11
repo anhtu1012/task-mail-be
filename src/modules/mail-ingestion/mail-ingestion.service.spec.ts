@@ -10,9 +10,13 @@ import type { UsersService } from '../users/users.service';
 describe('MailIngestionService', () => {
   it('polls no accounts without throwing when none are connected', async () => {
     const findAll = jest.fn().mockResolvedValue([]);
-    const mailAccountRepository = { findAll } as unknown as MailAccountRepository;
+    const mailAccountRepository = {
+      findAll,
+    } as unknown as MailAccountRepository;
     const buildOAuthClient = jest.fn();
-    const mailAccountsService = { buildOAuthClient } as unknown as MailAccountsService;
+    const mailAccountsService = {
+      buildOAuthClient,
+    } as unknown as MailAccountsService;
     const tasksService = {} as TasksService;
     const usersService = {} as UsersService;
 

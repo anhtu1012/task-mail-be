@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { TaskType } from '../../generated/prisma/client';
 import { TaskTypeRepository } from './repositories/task-type.repository';
-import { CreateTaskTypeDto, UpdateTaskTypeDto } from './dto/task-type-request.dto';
+import {
+  CreateTaskTypeDto,
+  UpdateTaskTypeDto,
+} from './dto/task-type-request.dto';
 import { NotFoundException } from '../../common/exceptions/not-found.exception';
 
 @Injectable()

@@ -11,13 +11,10 @@ export interface GoogleOAuthConfig {
   frontendUrl?: string;
 }
 
-export default registerAs(
-  'googleOAuth',
-  (): GoogleOAuthConfig => ({
-    clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI,
-    loginCallbackUrl: process.env.GOOGLE_OAUTH_LOGIN_CALLBACK_URL,
-    frontendUrl: process.env.FRONTEND_URL,
-  }),
-);
+export default registerAs('googleOAuth', (): GoogleOAuthConfig => ({
+  clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+  redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI,
+  loginCallbackUrl: process.env.GOOGLE_OAUTH_LOGIN_CALLBACK_URL,
+  frontendUrl: process.env.FRONTEND_URL,
+}));
