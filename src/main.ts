@@ -13,7 +13,7 @@ async function bootstrap() {
   app.use(cookieParser());
   app.enableCors({ origin: true, credentials: true });
   app.useGlobalPipes(AppValidationPipe);
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new HttpExceptionFilter(configService));
 
   setupSwagger(app);
 

@@ -18,5 +18,6 @@ import { TasksModule } from '../tasks/tasks.module';
     ZaloAccountRepository,
     ZaloLinkCodeRepository,
   ],
+  exports: [ZaloBotService, ZaloAccountRepository],
 })
 export class ZaloModule {}

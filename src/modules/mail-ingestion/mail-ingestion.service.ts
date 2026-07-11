@@ -7,6 +7,8 @@ import { MailAccountRepository } from '../mail-accounts/repositories/mail-accoun
 import { MailAccountsService } from '../mail-accounts/mail-accounts.service';
 import { TasksService } from '../tasks/tasks.service';
 import { UsersService } from '../users/users.service';
+import { ZaloBotService } from '../zalo/zalo-bot.service';
+import { ZaloAccountRepository } from '../zalo/repositories/zalo-account.repository';
 import { MailConfig } from '../../config/mail.config';
 import { SecurityConfig } from '../../config/security.config';
 import { EncryptionUtil } from '../../common/utils/encryption.util';
@@ -15,15 +17,62 @@ import { parseTaskMail } from './parsers/task-mail.parser';
 
 const EXTERNAL_SYNC_STATUS = 'IMPORTED_FROM_GMAIL';
 
-function extractPlainText(part?: gmail_v1.Schema$MessagePart): string {
-  if (!part) return '';
-  if (part.mimeType === 'text/plain' && part.body?.data) {
-    return Buffer.from(part.body.data, 'base64url').toString('utf-8');
-  }
+// Distinguishes a revoked/expired refresh token (which requires the user to
+// reconnect Gmail — retrying on the next poll cycle can never succeed) from a
+// transient Gmail API failure (rate limit, network blip) that's worth retrying.
+function isInvalidGrantError(error: unknown): boolean {
+  const gaxiosError = error as {
+    response?: { data?: { error?: string } };
+    message?: string;
+  };
+  return (
+    gaxiosError?.response?.data?.error === 'invalid_grant' ||
+    (typeof gaxiosError?.message === 'string' &&
+      gaxiosError.message.includes('invalid_grant'))
+  );
+}
+
+function findPartByMimeType(
+  part: gmail_v1.Schema$MessagePart | undefined,
+  mimeType: string,
+): gmail_v1.Schema$MessagePart | undefined {
+  if (!part) return undefined;
+  if (part.mimeType === mimeType && part.body?.data) return part;
   for (const child of part.parts ?? []) {
-    const text = extractPlainText(child);
-    if (text) return text;
+    const found = findPartByMimeType(child, mimeType);
+    if (found) return found;
   }
+  return undefined;
+}
+
+function decodeBase64Url(data: string): string {
+  return Buffer.from(data, 'base64url').toString('utf-8');
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .trim();
+}
+
+// Prefers text/plain; task-notification systems commonly send an HTML-only template
+// (no plain-text alternative), so falling back to a stripped text/html part is
+// required for deadline/priority/assignee extraction to work on those mails.
+function extractPlainText(payload?: gmail_v1.Schema$MessagePart): string {
+  const plainPart = findPartByMimeType(payload, 'text/plain');
+  if (plainPart?.body?.data) return decodeBase64Url(plainPart.body.data);
+
+  const htmlPart = findPartByMimeType(payload, 'text/html');
+  if (htmlPart?.body?.data) return stripHtml(decodeBase64Url(htmlPart.body.data));
+
   return '';
 }
 
@@ -63,6 +112,10 @@ function extractAttachmentFilenames(
 @Injectable()
 export class MailIngestionService {
   private readonly logger = new Logger(MailIngestionService.name);
+  // Reconnect prompts are best-effort and reset on restart — a Set (rather than a
+  // persisted DB flag) is enough to stop re-notifying every 5 minutes for the same
+  // broken account within a single process lifetime.
+  private readonly reconnectNotified = new Set<string>();
 
   constructor(
     private readonly configService: ConfigService,
@@ -70,6 +123,8 @@ export class MailIngestionService {
     private readonly mailAccountsService: MailAccountsService,
     private readonly tasksService: TasksService,
     private readonly usersService: UsersService,
+    private readonly zaloBotService: ZaloBotService,
+    private readonly zaloAccountRepository: ZaloAccountRepository,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES)
@@ -83,7 +138,7 @@ export class MailIngestionService {
   private async pollAccount(account: MailAccount): Promise<void> {
     try {
       const mailConfig = this.configService.get<MailConfig>('mail');
-      const prefix = mailConfig?.taskSubjectPrefix ?? '[TASK]';
+      const prefixes = mailConfig?.taskSubjectPrefixes ?? ['[TASK]'];
       const lookbackDays = mailConfig?.taskLookbackDays ?? 7;
       const key =
         this.configService.getOrThrow<SecurityConfig>(
@@ -114,13 +169,19 @@ export class MailIngestionService {
       });
 
       const gmail = google.gmail({ version: 'v1', auth: client });
-      // Not filtered by is:unread — already-read mail matching the subject prefix must
+      // Gmail's subject: search doesn't treat brackets literally, so the bare word of
+      // each tag (e.g. "TASK", "OPER") is OR'd together — this is a coarse pre-filter;
+      // parseTaskMail() re-checks the exact bracketed prefix against the subject.
+      // Not filtered by is:unread — already-read mail matching a subject prefix must
       // also be picked up. Duplicate creation is instead prevented by the externalRef
       // dedup check in processMessage(). newer_than bounds the scan window so a poll
       // cycle doesn't re-fetch the account's entire mail history every 5 minutes.
+      const searchTerms = prefixes
+        .map((p) => p.replace(/[^\p{L}\p{N}]+/gu, '').trim())
+        .filter(Boolean);
       const { data } = await gmail.users.messages.list({
         userId: 'me',
-        q: `subject:(${prefix}) newer_than:${lookbackDays}d`,
+        q: `subject:(${searchTerms.join(' OR ')}) newer_than:${lookbackDays}d`,
       });
 
       for (const message of data.messages ?? []) {
@@ -128,14 +189,56 @@ export class MailIngestionService {
           await this.processMessage(
             gmail,
             message.id,
-            prefix,
+            prefixes,
             account.userId,
             account.id,
           );
       }
+      // A poll cycle completing without throwing means the token works again —
+      // clear the reconnect flag so a future revocation gets re-notified.
+      this.reconnectNotified.delete(account.id);
     } catch (error) {
+      if (isInvalidGrantError(error)) {
+        this.logger.warn(
+          `[MailIngestion][ReconnectRequired] Gmail refresh token invalid/revoked for ` +
+            `account ${account.email} (mailAccountId=${account.id}, userId=${account.userId}). ` +
+            `Ingestion cannot recover automatically — the owner must reconnect via /mail-accounts/google/connect.`,
+        );
+        await this.notifyReconnectRequired(account);
+        return;
+      }
       this.logger.error(
         `Mail ingestion cycle failed for account ${account.email}`,
+        error as Error,
+      );
+    }
+  }
+
+  private async notifyReconnectRequired(account: MailAccount): Promise<void> {
+    if (this.reconnectNotified.has(account.id)) return;
+    this.reconnectNotified.add(account.id);
+
+    try {
+      const zaloAccount = await this.zaloAccountRepository.findByUserId(
+        account.userId,
+      );
+      if (!zaloAccount) {
+        this.logger.warn(
+          `Skipped reconnect-Gmail Zalo notification for account ${account.email}: owner has no linked Zalo account`,
+        );
+        return;
+      }
+      await this.zaloBotService.sendTextMessage(
+        zaloAccount.zaloUserId,
+        [
+          '⚠️ Mất kết nối Gmail',
+          `Tài khoản ${account.email} đã bị thu hồi/hết hạn quyền truy cập, hệ thống không thể đọc task mới từ mail.`,
+          'Vui lòng kết nối lại Gmail trong ứng dụng.',
+        ].join('\n'),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send reconnect-Gmail Zalo notification for account ${account.email}`,
         error as Error,
       );
     }
@@ -144,7 +247,7 @@ export class MailIngestionService {
   private async processMessage(
     gmail: gmail_v1.Gmail,
     messageId: string,
-    subjectPrefix: string,
+    subjectPrefixes: string[],
     mailboxOwnerId: string,
     mailAccountId: string,
   ): Promise<void> {
@@ -156,7 +259,7 @@ export class MailIngestionService {
       });
       const subject = extractSubject(data.payload);
       const bodyText = extractPlainText(data.payload);
-      const parsedTask = parseTaskMail(subject, bodyText, subjectPrefix);
+      const parsedTask = parseTaskMail(subject, bodyText, subjectPrefixes);
 
       if (parsedTask) {
         const rfcMessageId = extractRfcMessageId(data.payload);

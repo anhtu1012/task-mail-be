@@ -89,6 +89,22 @@ describe('parseTaskMail', () => {
     );
   });
 
+  it('matches any prefix in a list and strips the matched one from the title', () => {
+    const result = parseTaskMail(
+      '[OPER] THÔNG BÁO TASK',
+      'Deadline: 10/07/2026 22:00',
+      ['[TASK]', '[OPER]'],
+    );
+    expect(result?.title).toBe('THÔNG BÁO TASK');
+    expect(result?.deadline).toEqual(new Date(2026, 6, 10, 22, 0));
+  });
+
+  it('returns null when the subject matches none of the configured prefixes', () => {
+    expect(
+      parseTaskMail('[NEWS] Bản tin tuần', 'nội dung', ['[TASK]', '[OPER]']),
+    ).toBeNull();
+  });
+
   it('has no assignee email when there is no directive', () => {
     const result = parseTaskMail(
       '[TASK] Việc',

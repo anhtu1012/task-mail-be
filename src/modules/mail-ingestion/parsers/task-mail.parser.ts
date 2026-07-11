@@ -56,19 +56,27 @@ function extractAssigneeEmail(bodyText: string): string | undefined {
 
 /**
  * Detects and extracts task fields from a mail subject/body using fixed rules
- * (no LLM): the subject must start with `prefix` (case-insensitive) to count as a task.
+ * (no LLM): the subject must start with one of `prefixes` (case-insensitive) to
+ * count as a task. Different senders/teams tag their subjects differently (e.g.
+ * "[TASK]" vs "[OPER]"), so multiple prefixes can be configured and are tried in
+ * order — the first one the subject starts with is stripped to form the title.
  */
 export function parseTaskMail(
   subject: string,
   bodyText: string,
-  prefix: string,
+  prefixes: string | string[],
 ): ParsedTaskMail | null {
   const trimmedSubject = (subject ?? '').trim();
-  const normalizedPrefix = prefix.trim().toLowerCase();
+  const candidates = (Array.isArray(prefixes) ? prefixes : [prefixes])
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-  if (!trimmedSubject.toLowerCase().startsWith(normalizedPrefix)) return null;
+  const matchedPrefix = candidates.find((prefix) =>
+    trimmedSubject.toLowerCase().startsWith(prefix.toLowerCase()),
+  );
+  if (!matchedPrefix) return null;
 
-  const title = trimmedSubject.slice(prefix.trim().length).trim();
+  const title = trimmedSubject.slice(matchedPrefix.length).trim();
   const body = bodyText ?? '';
 
   return {

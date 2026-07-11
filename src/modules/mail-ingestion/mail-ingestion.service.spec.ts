@@ -4,6 +4,8 @@ import type { MailAccountRepository } from '../mail-accounts/repositories/mail-a
 import type { MailAccountsService } from '../mail-accounts/mail-accounts.service';
 import type { TasksService } from '../tasks/tasks.service';
 import type { UsersService } from '../users/users.service';
+import type { ZaloBotService } from '../zalo/zalo-bot.service';
+import type { ZaloAccountRepository } from '../zalo/repositories/zalo-account.repository';
 
 // Type-only imports for the collaborators keep this test from pulling in PrismaService
 // (and the generated Prisma client) transitively — plain construction, no Nest DI container.
@@ -19,6 +21,8 @@ describe('MailIngestionService', () => {
     } as unknown as MailAccountsService;
     const tasksService = {} as TasksService;
     const usersService = {} as UsersService;
+    const zaloBotService = {} as ZaloBotService;
+    const zaloAccountRepository = {} as ZaloAccountRepository;
 
     const service = new MailIngestionService(
       new ConfigService({}),
@@ -26,6 +30,8 @@ describe('MailIngestionService', () => {
       mailAccountsService,
       tasksService,
       usersService,
+      zaloBotService,
+      zaloAccountRepository,
     );
 
     await expect(service.pollMailAccounts()).resolves.toBeUndefined();

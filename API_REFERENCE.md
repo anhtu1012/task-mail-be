@@ -265,8 +265,8 @@ Body (`UpdateTaskDto` = mọi field của `CreateTaskDto` là optional, cộng t
 
 Sau khi user connect Gmail (mục 5), backend tự động:
 
-- Cứ mỗi 5 phút, quét các email mới trong mailbox có subject bắt đầu bằng `[TASK]` (đổi được qua env `MAIL_TASK_SUBJECT_PREFIX`), trong vòng 7 ngày gần nhất.
-- Parse nội dung email để suy ra: `title` (từ subject), `description` (nội dung email), `deadline` (regex tìm `deadline:` / `hạn: dd/mm/yyyy hh:mm`), `priority` (từ khoá "khẩn cấp"/"gấp" → `URGENT`, "cao" → `HIGH`), `attachments` (URL trong nội dung + tên file đính kèm Gmail thật), `assigneeId` (dòng `Giao cho:` / `Gán cho:` / `Assign to: <email>` trong nội dung — nếu email khớp user đã đăng ký thì gán cho họ, không thì gán cho chủ mailbox).
+- Cứ mỗi 5 phút, quét các email mới trong mailbox có subject bắt đầu bằng một trong các tiền tố cấu hình qua env `MAIL_TASK_SUBJECT_PREFIX` (mặc định `[TASK]`; hỗ trợ nhiều tiền tố cách nhau bởi dấu phẩy, ví dụ `MAIL_TASK_SUBJECT_PREFIX=[TASK],[OPER]` để nhận cả email gắn tag `[OPER]`), trong vòng 7 ngày gần nhất.
+- Parse nội dung email để suy ra: `title` (từ subject, đã bỏ tiền tố khớp), `description` (nội dung email — lấy từ phần `text/plain`, hoặc fallback sang `text/html` đã lược bỏ thẻ nếu email không có bản plain-text), `deadline` (regex tìm `deadline:` / `hạn: dd/mm/yyyy hh:mm`), `priority` (từ khoá "khẩn cấp"/"gấp" → `URGENT`, "cao" → `HIGH`), `attachments` (URL trong nội dung + tên file đính kèm Gmail thật), `assigneeId` (dòng `Giao cho:` / `Gán cho:` / `Assign to: <email>` trong nội dung — nếu email khớp user đã đăng ký thì gán cho họ, không thì gán cho chủ mailbox).
 - Chống trùng lặp qua `Message-ID` của email — mỗi email chỉ tạo 1 task duy nhất dù quét lại nhiều lần.
 - Task tạo ra xuất hiện bình thường trong `GET /tasks`, có `sourceMailAccountId` khác `null` để FE phân biệt (có thể hiển thị badge "Từ email" hoặc filter riêng bằng query `sourceMailAccountId`).
 - FE không cần gọi API gì thêm cho tính năng này — chỉ cần hiển thị task như task thường, và (tuỳ chọn) làm nổi bật task có `sourceMailAccountId`.
