@@ -4,11 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - '${PORT:-9999}:9999'
+      - '${PORT:-9999}:${PORT:-9999}'
     env_file:
       - .env
     environment:
-      PORT: 9999
       DATABASE_URL: postgresql://postgres:password@db:5432/cms_db?schema=public
     depends_on:
       db:

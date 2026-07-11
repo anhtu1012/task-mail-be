@@ -18,6 +18,7 @@ ENV NODE_ENV=production
 RUN apk add --no-cache python3 make g++ openssl
 
 COPY package*.json ./
+COPY prisma.config.ts ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev && npx prisma generate
 
