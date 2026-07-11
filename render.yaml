@@ -11,6 +11,8 @@ services:
         value: production
       - key: PORT
         value: 9999
+      - key: APP_URL
+        value: https://task-mail-be.onrender.com
       - key: DATABASE_URL
         sync: false
       - key: JWT_ACCESS_SECRET
@@ -29,7 +31,9 @@ services:
         sync: false
       - key: GOOGLE_OAUTH_CLIENT_SECRET
         sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        value: https://task-mail-be.onrender.com/mail-accounts/google/callback
       - key: GOOGLE_OAUTH_LOGIN_CALLBACK_URL
-        sync: false
+        value: https://task-mail-be.onrender.com/auth/google/callback
       - key: FRONTEND_URL
         sync: false

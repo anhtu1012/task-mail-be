@@ -12,7 +12,7 @@ export class CookieUtil {
     res.cookie(COOKIE_KEYS.REFRESH_TOKEN, token, {
       httpOnly: true,
       secure: config.secure,
-      sameSite: 'strict',
+      sameSite: config.sameSite,
       domain: config.domain,
       path: '/',
       maxAge: maxAgeMs,
@@ -23,7 +23,7 @@ export class CookieUtil {
     res.clearCookie(COOKIE_KEYS.REFRESH_TOKEN, {
       httpOnly: true,
       secure: config.secure,
-      sameSite: 'strict',
+      sameSite: config.sameSite,
       domain: config.domain,
       path: '/',
     });
