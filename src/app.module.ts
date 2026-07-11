@@ -16,6 +16,7 @@ import { MailIngestionModule } from './modules/mail-ingestion/mail-ingestion.mod
 import { ZaloModule } from './modules/zalo/zalo.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
+import { KeepAliveService } from './common/keep-alive/keep-alive.service';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
   controllers: [AppController],
   providers: [
     AppService,
+    KeepAliveService,
     // Global auth: every route requires a valid access token unless annotated with @Public().
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },
