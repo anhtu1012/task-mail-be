@@ -10,8 +10,18 @@ import type { TaskCreatedEvent } from '../tasks/events/task-created.event';
 import { TaskResponseDto } from '../tasks/dto/task-response.dto';
 import { ZaloConfig } from '../../config/zalo.config';
 
+const MAX_DESCRIPTION_LENGTH = 1000;
+
 function formatDeadline(deadline?: Date | null): string {
   return deadline ? new Date(deadline).toLocaleString('vi-VN') : 'không có';
+}
+
+function formatDescription(description?: string | null): string {
+  const trimmed = description?.trim();
+  if (!trimmed) return '(không có mô tả)';
+  return trimmed.length > MAX_DESCRIPTION_LENGTH
+    ? `${trimmed.slice(0, MAX_DESCRIPTION_LENGTH)}…`
+    : trimmed;
 }
 
 function formatNewTaskMessage(task: TaskCreatedEvent): string {
@@ -20,6 +30,9 @@ function formatNewTaskMessage(task: TaskCreatedEvent): string {
     task.title,
     `Ưu tiên: ${task.priority}`,
     `Deadline: ${formatDeadline(task.deadline)}`,
+    '',
+    'Mô tả:',
+    formatDescription(task.description),
   ].join('\n');
 }
 

@@ -6,6 +6,7 @@ export type TaskCreatedEvent = {
   id: string;
   assigneeId: string;
   title: string;
+  description?: string | null;
   priority: TaskPriority;
   deadline?: Date | null;
 };

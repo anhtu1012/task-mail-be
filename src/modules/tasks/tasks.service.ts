@@ -259,6 +259,7 @@ export class TasksService {
       id: task.id,
       assigneeId: task.assigneeId,
       title: task.title,
+      description: task.description,
       priority: task.priority,
       deadline: task.deadline,
     });
