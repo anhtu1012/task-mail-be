@@ -9,6 +9,7 @@ import { TASK_CREATED_EVENT } from '../tasks/events/task-created.event';
 import type { TaskCreatedEvent } from '../tasks/events/task-created.event';
 import { TaskResponseDto } from '../tasks/dto/task-response.dto';
 import { ZaloConfig } from '../../config/zalo.config';
+import { GoogleOAuthConfig } from '../../config/google.config';
 
 const MAX_DESCRIPTION_LENGTH = 1000;
 
@@ -24,7 +25,10 @@ function formatDescription(description?: string | null): string {
     : trimmed;
 }
 
-function formatNewTaskMessage(task: TaskCreatedEvent): string {
+function formatNewTaskMessage(
+  task: TaskCreatedEvent,
+  tasksUrl?: string,
+): string {
   return [
     '🔔 Bạn được giao task mới:',
     task.title,
@@ -33,6 +37,7 @@ function formatNewTaskMessage(task: TaskCreatedEvent): string {
     '',
     'Mô tả:',
     formatDescription(task.description),
+    ...(tasksUrl ? ['', `Xem task tại: ${tasksUrl}`] : []),
   ].join('\n');
 }
 
@@ -66,9 +71,14 @@ export class ZaloNotificationListener {
         );
         return;
       }
+      const { frontendUrl } =
+        this.configService.getOrThrow<GoogleOAuthConfig>('googleOAuth');
+      const tasksUrl = frontendUrl
+        ? new URL('/tasks', frontendUrl).toString()
+        : undefined;
       await this.zaloBotService.sendTextMessage(
         account.zaloUserId,
-        formatNewTaskMessage(task),
+        formatNewTaskMessage(task, tasksUrl),
       );
     } catch (error) {
       this.logger.error(

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { google } from 'googleapis';
+import type { StringValue } from 'ms';
 import type { MailAccount } from '../../generated/prisma/client';
 import { GoogleOAuthConfig } from '../../config/google.config';
 import { SecurityConfig } from '../../config/security.config';
@@ -19,7 +20,8 @@ const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
 ];
 
-const STATE_TOKEN_TTL = '5m';
+const STATE_TOKEN_TTL: StringValue = '5m';
+export const NOTIFICATION_STATE_TOKEN_TTL: StringValue = '24h';
 const isPrivileged = (role: Role) =>
   role === Role.ADMIN || role === Role.SUPER_ADMIN;
 
@@ -40,12 +42,15 @@ export class MailAccountsService {
     );
   }
 
-  getConnectUrl(userId: string): string {
+  getConnectUrl(
+    userId: string,
+    expiresIn: StringValue = STATE_TOKEN_TTL,
+  ): string {
     const state = this.jwtService.sign(
       { sub: userId, purpose: 'mail-connect' },
       {
         secret: this.configService.getOrThrow<string>('auth.accessSecret'),
-        expiresIn: STATE_TOKEN_TTL,
+        expiresIn,
       },
     );
 

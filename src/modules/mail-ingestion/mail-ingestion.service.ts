@@ -4,7 +4,10 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { gmail_v1, google } from 'googleapis';
 import type { MailAccount } from '../../generated/prisma/client';
 import { MailAccountRepository } from '../mail-accounts/repositories/mail-account.repository';
-import { MailAccountsService } from '../mail-accounts/mail-accounts.service';
+import {
+  MailAccountsService,
+  NOTIFICATION_STATE_TOKEN_TTL,
+} from '../mail-accounts/mail-accounts.service';
 import { TasksService } from '../tasks/tasks.service';
 import { UsersService } from '../users/users.service';
 import { ZaloBotService } from '../zalo/zalo-bot.service';
@@ -228,12 +231,17 @@ export class MailIngestionService {
         );
         return;
       }
+      const reconnectUrl = this.mailAccountsService.getConnectUrl(
+        account.userId,
+        NOTIFICATION_STATE_TOKEN_TTL,
+      );
       await this.zaloBotService.sendTextMessage(
         zaloAccount.zaloUserId,
         [
           '⚠️ Mất kết nối Gmail',
           `Tài khoản ${account.email} đã bị thu hồi/hết hạn quyền truy cập, hệ thống không thể đọc task mới từ mail.`,
-          'Vui lòng kết nối lại Gmail trong ứng dụng.',
+          'Bấm link dưới đây để kết nối lại:',
+          reconnectUrl,
         ].join('\n'),
       );
     } catch (error) {
