@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   MIN_POSITION_GAP,
   POSITION_GAP,
@@ -16,6 +16,8 @@ import { BoardCardRepository } from '../repositories/board-card.repository';
  */
 @Injectable()
 export class PositionService {
+  private readonly logger = new Logger(PositionService.name);
+
   constructor(
     private readonly boardRepository: BoardRepository,
     private readonly cardRepository: BoardCardRepository,
@@ -62,6 +64,13 @@ export class PositionService {
 
     // The gap has collapsed: renumber the column, then re-derive the slot from
     // the card that used to sit at the requested position.
+    //
+    // This line is the signal for whether the scheduled rebalance job from spec
+    // 2.1 is worth building: if it shows up regularly in production logs, the
+    // inline fix-up is no longer rare enough to rely on.
+    this.logger.warn(
+      `Khoảng cách position đã cạn ở cột ${listId ?? 'inbox'} (bảng ${boardId}) — đánh số lại cả cột`,
+    );
     const renumbered = await this.rebalanceCards(boardId, listId);
     const index = renumbered.findIndex((row) => row.id === occupant.id);
     const before = index > 0 ? renumbered[index - 1].position : 0;

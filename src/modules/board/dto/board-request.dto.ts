@@ -1,4 +1,8 @@
-import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
+import {
+  ApiPropertyOptional,
+  ApiProperty,
+  IntersectionType,
+} from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -360,13 +364,35 @@ export class SearchQueryDto {
   limit?: number;
 }
 
-/** `?undo=true` bỏ ghi nhật ký, để Ctrl+Z không làm rác nhật ký (mục 5.7). */
+/**
+ * `?undo=true` bỏ bước ghi `TaskActivity`, để Ctrl+Z không làm rác nhật ký
+ * (mục 5.7.3 của đặc tả).
+ *
+ * Mọi endpoint ghi đều **nhận** cờ này, kể cả endpoint hiện chưa ghi nhật ký:
+ * nếu không nhận thì `forbidNonWhitelisted` trả 400, và frontend sẽ phải nhớ
+ * endpoint nào được gửi cờ, endpoint nào không.
+ */
 export class UndoFlagQueryDto {
   @ApiPropertyOptional({ default: false })
   @IsOptional()
-  @Transform(
-    ({ value }: { value: unknown }) => value === 'true' || value === true,
-  )
+  // Đọc `obj` (giá trị thô) chứ không đọc `value`: `enableImplicitConversion`
+  // đã ép chuỗi về Boolean trước khi tới đây, mà `Boolean('false')` là `true` —
+  // nên `?undo=false` sẽ bị hiểu thành có undo nếu đọc `value`.
+  @Transform(({ obj }: { obj: Record<string, unknown> }) => {
+    const raw = obj?.undo;
+    return raw === 'true' || raw === '1' || raw === true;
+  })
   @IsBoolean()
   undo?: boolean;
 }
+
+/**
+ * Phải là class thật chứ không phải `TimezoneQueryDto & UndoFlagQueryDto`:
+ * intersection của TypeScript bị xoá lúc biên dịch nên Nest chỉ thấy `Object`,
+ * bỏ qua ValidationPipe, và `undo` nằm lại dưới dạng chuỗi `'true'` — so sánh
+ * `=== true` sẽ luôn sai.
+ */
+export class SnoozeQueryDto extends IntersectionType(
+  TimezoneQueryDto,
+  UndoFlagQueryDto,
+) {}

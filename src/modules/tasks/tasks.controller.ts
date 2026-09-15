@@ -28,6 +28,7 @@ import {
   TaskResponseDto,
 } from './dto/task-response.dto';
 import { TaskStatsResponseDto } from './dto/task-stats-response.dto';
+import { UndoFlagQueryDto } from '../board/dto/board-request.dto';
 import { API_ROUTES } from '../../common/constants/api-routes.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequestWithUser } from '../../common/types/request-with-user.type';
@@ -90,8 +91,9 @@ export class TasksController {
     @CurrentUser() user: RequestWithUser['user'],
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() dto: UpdateTaskDto,
+    @Query() flags: UndoFlagQueryDto,
   ): Promise<TaskResponseDto> {
-    return this.tasksService.update(user, id, dto);
+    return this.tasksService.update(user, id, dto, flags.undo === true);
   }
 
   // PATCH :id/complete lives in BoardCardsController: completing a repeating

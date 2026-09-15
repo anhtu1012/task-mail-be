@@ -3,6 +3,7 @@ import { TasksService } from './tasks.service';
 import type { TaskRepository } from './repositories/task.repository';
 import type { BoardAccessService } from '../board/services/board-access.service';
 import type { BoardService } from '../board/services/board.service';
+import type { ActivityService } from '../board/services/activity.service';
 import { Role } from '../../common/enums/role.enum';
 import { TaskPriority } from '../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../common/enums/task-status.enum';
@@ -47,13 +48,24 @@ describe('TasksService', () => {
     const boardService = {
       assertLabelsInBoard: jest.fn().mockResolvedValue(undefined),
     } as unknown as BoardService;
+    const activityService = {
+      record: jest.fn().mockResolvedValue(undefined),
+      dueChanged: jest.fn().mockReturnValue('Đổi hạn'),
+    } as unknown as ActivityService;
     const service = new TasksService(
       taskRepository,
       eventEmitter,
       boardAccess,
       boardService,
+      activityService,
     );
-    return { service, taskRepository, eventEmitter, boardAccess };
+    return {
+      service,
+      taskRepository,
+      eventEmitter,
+      boardAccess,
+      activityService,
+    };
   }
 
   it('emits task.created after creating a task via the API path', async () => {

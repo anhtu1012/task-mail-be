@@ -29,7 +29,7 @@ import {
   MoveCardDto,
   SetCardLabelsDto,
   SnoozeCardDto,
-  TimezoneQueryDto,
+  SnoozeQueryDto,
   UndoFlagQueryDto,
   UpsertNoteDto,
 } from '../dto/board-request.dto';
@@ -83,7 +83,7 @@ export class BoardCardsController {
     @CurrentUser() user: RequestWithUser['user'],
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() dto: SnoozeCardDto,
-    @Query() query: TimezoneQueryDto & UndoFlagQueryDto,
+    @Query() query: SnoozeQueryDto,
   ): Promise<CardSummaryDto> {
     return this.cardService.snooze(
       user.sub,
@@ -115,8 +115,9 @@ export class BoardCardsController {
   complete(
     @CurrentUser() user: RequestWithUser['user'],
     @Param('id', ParseObjectIdPipe) id: string,
+    @Query() flags: UndoFlagQueryDto,
   ): Promise<CompleteCardResponseDto> {
-    return this.cardService.complete(user.sub, id);
+    return this.cardService.complete(user.sub, id, flags.undo === true);
   }
 
   @Patch(':id/reopen')
@@ -125,8 +126,9 @@ export class BoardCardsController {
   reopen(
     @CurrentUser() user: RequestWithUser['user'],
     @Param('id', ParseObjectIdPipe) id: string,
+    @Query() flags: UndoFlagQueryDto,
   ): Promise<CardSummaryDto> {
-    return this.cardService.reopen(user.sub, id);
+    return this.cardService.reopen(user.sub, id, flags.undo === true);
   }
 
   @Post(`:id/${API_ROUTES.TASKS.RESTORE}`)
@@ -136,6 +138,9 @@ export class BoardCardsController {
   restore(
     @CurrentUser() user: RequestWithUser['user'],
     @Param('id', ParseObjectIdPipe) id: string,
+    // Khôi phục không ghi nhật ký (không có ActivityAction tương ứng), nhưng
+    // vẫn nhận cờ để frontend gửi đồng loạt mà không bị 400.
+    @Query() _flags: UndoFlagQueryDto,
   ): Promise<CardSummaryDto> {
     return this.cardService.restore(user.sub, id);
   }
