@@ -28,12 +28,60 @@ describe('parseTaskMail', () => {
       'Nội dung.\nDeadline: 10/07/2026 17:30\nCảm ơn.',
       '[TASK]',
     );
-    expect(result?.deadline).toEqual(new Date(2026, 6, 10, 17, 30));
+    expect(result?.deadline).toEqual({
+      year: 2026,
+      month: 7,
+      day: 10,
+      hour: 17,
+      minute: 30,
+    });
   });
 
   it('extracts a Vietnamese "Hạn:" deadline without time', () => {
     const result = parseTaskMail('[TASK] Việc', 'Hạn: 01/08/2026', '[TASK]');
-    expect(result?.deadline).toEqual(new Date(2026, 7, 1, 0, 0));
+    expect(result?.deadline).toEqual({
+      year: 2026,
+      month: 8,
+      day: 1,
+      hour: 0,
+      minute: 0,
+    });
+  });
+
+  // The whole point of returning parts instead of a Date: the parser must give
+  // the same answer on a UTC container as on a GMT+7 laptop.
+  it('does not depend on the server timezone', () => {
+    const original = process.env.TZ;
+    const read = () =>
+      parseTaskMail('[TASK] Việc', 'Hạn: 20/09/2026 18:00', '[TASK]')?.deadline;
+
+    try {
+      process.env.TZ = 'UTC';
+      const asUtc = read();
+      process.env.TZ = 'Asia/Ho_Chi_Minh';
+      const asSaigon = read();
+      expect(asUtc).toEqual(asSaigon);
+      expect(asUtc).toEqual({
+        year: 2026,
+        month: 9,
+        day: 20,
+        hour: 18,
+        minute: 0,
+      });
+    } finally {
+      process.env.TZ = original;
+    }
+  });
+
+  it.each([
+    'Hạn: 32/09/2026',
+    'Hạn: 20/13/2026',
+    'Hạn: 20/09/2026 25:00',
+    'Hạn: 20/09/2026 18:70',
+  ])('bỏ qua ngày giờ không hợp lệ: %s', (body) => {
+    expect(
+      parseTaskMail('[TASK] Việc', body, '[TASK]')?.deadline,
+    ).toBeUndefined();
   });
 
   it('has no deadline when none is present', () => {
@@ -96,7 +144,13 @@ describe('parseTaskMail', () => {
       ['[TASK]', '[OPER]'],
     );
     expect(result?.title).toBe('THÔNG BÁO TASK');
-    expect(result?.deadline).toEqual(new Date(2026, 6, 10, 22, 0));
+    expect(result?.deadline).toEqual({
+      year: 2026,
+      month: 7,
+      day: 10,
+      hour: 22,
+      minute: 0,
+    });
   });
 
   it('returns null when the subject matches none of the configured prefixes', () => {

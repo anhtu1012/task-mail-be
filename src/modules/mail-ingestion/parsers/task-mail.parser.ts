@@ -1,9 +1,26 @@
 import { TaskPriority } from '../../../common/enums/task-priority.enum';
 
+/**
+ * The deadline as written in the mail, still as wall-clock numbers.
+ *
+ * Deliberately not a `Date`: "20/09/2026 18:00" names an instant only once you
+ * know whose timezone it is meant in, and the parser does not know the assignee
+ * yet. Resolving it here with `new Date(y, m, d, …)` would silently read the
+ * numbers in the server's zone — UTC in the container, GMT+7 on a dev laptop —
+ * and store two different instants for the same email.
+ */
+export type ParsedDeadline = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+};
+
 export type ParsedTaskMail = {
   title: string;
   description: string;
-  deadline?: Date;
+  deadline?: ParsedDeadline;
   priority: TaskPriority;
   attachments: string[];
   assigneeEmail?: string;
@@ -22,19 +39,28 @@ const ASSIGNEE_REGEX =
 
 const MAX_DESCRIPTION_LENGTH = 2000;
 
-function extractDeadline(bodyText: string): Date | undefined {
+function extractDeadline(bodyText: string): ParsedDeadline | undefined {
   const match = DEADLINE_REGEX.exec(bodyText);
   if (!match) return undefined;
 
   const [, day, month, year, hour, minute] = match;
-  const date = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    hour ? Number(hour) : 0,
-    minute ? Number(minute) : 0,
-  );
-  return Number.isNaN(date.getTime()) ? undefined : date;
+  const parsed: ParsedDeadline = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: hour ? Number(hour) : 0,
+    minute: minute ? Number(minute) : 0,
+  };
+
+  // The regex allows 1-2 digits, so "32/13/2026" or "25:00" reach here.
+  const inRange =
+    parsed.month >= 1 &&
+    parsed.month <= 12 &&
+    parsed.day >= 1 &&
+    parsed.day <= 31 &&
+    parsed.hour <= 23 &&
+    parsed.minute <= 59;
+  return inRange ? parsed : undefined;
 }
 
 function extractPriority(bodyText: string): TaskPriority {

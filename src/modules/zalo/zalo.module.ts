@@ -7,9 +7,10 @@ import { ZaloNotificationListener } from './zalo-notification.listener';
 import { ZaloAccountRepository } from './repositories/zalo-account.repository';
 import { ZaloLinkCodeRepository } from './repositories/zalo-link-code.repository';
 import { TasksModule } from '../tasks/tasks.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [TasksModule],
+  imports: [TasksModule, UsersModule],
   controllers: [ZaloAccountsController, ZaloBotController],
   providers: [
     ZaloBotService,

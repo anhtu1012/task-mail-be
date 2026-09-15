@@ -5,6 +5,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ZaloBotService } from './zalo-bot.service';
 import { ZaloAccountRepository } from './repositories/zalo-account.repository';
 import { TasksService } from '../tasks/tasks.service';
+import { UsersService } from '../users/users.service';
 import { TASK_CREATED_EVENT } from '../tasks/events/task-created.event';
 import type { TaskCreatedEvent } from '../tasks/events/task-created.event';
 import { TaskResponseDto } from '../tasks/dto/task-response.dto';
@@ -13,8 +14,24 @@ import { GoogleOAuthConfig } from '../../config/google.config';
 
 const MAX_DESCRIPTION_LENGTH = 1000;
 
-function formatDeadline(deadline?: Date | null): string {
-  return deadline ? new Date(deadline).toLocaleString('vi-VN') : 'không có';
+/**
+ * Always formatted in the recipient's zone. `toLocaleString('vi-VN')` without a
+ * `timeZone` renders in the server's zone — UTC in the container — so the
+ * message would show a time seven hours off what the user actually has.
+ */
+export function formatDeadline(
+  deadline: Date | null | undefined,
+  timeZone: string,
+): string {
+  if (!deadline) return 'không có';
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(deadline));
 }
 
 function formatDescription(description?: string | null): string {
@@ -27,13 +44,14 @@ function formatDescription(description?: string | null): string {
 
 function formatNewTaskMessage(
   task: TaskCreatedEvent,
+  timeZone: string,
   tasksUrl?: string,
 ): string {
   return [
     '🔔 Bạn được giao task mới:',
     task.title,
     `Ưu tiên: ${task.priority}`,
-    `Deadline: ${formatDeadline(task.deadline)}`,
+    `Deadline: ${formatDeadline(task.deadline, timeZone)}`,
     '',
     'Mô tả:',
     formatDescription(task.description),
@@ -41,10 +59,13 @@ function formatNewTaskMessage(
   ].join('\n');
 }
 
-function formatDeadlineMessage(task: TaskResponseDto): string {
+function formatDeadlineMessage(
+  task: TaskResponseDto,
+  timeZone: string,
+): string {
   return [
     `⏰ Task "${task.title}" sắp đến hạn`,
-    `Deadline: ${formatDeadline(task.deadline)}`,
+    `Deadline: ${formatDeadline(task.deadline, timeZone)}`,
   ].join('\n');
 }
 
@@ -57,6 +78,7 @@ export class ZaloNotificationListener {
     private readonly zaloBotService: ZaloBotService,
     private readonly zaloAccountRepository: ZaloAccountRepository,
     private readonly tasksService: TasksService,
+    private readonly usersService: UsersService,
   ) {}
 
   @OnEvent(TASK_CREATED_EVENT)
@@ -76,9 +98,10 @@ export class ZaloNotificationListener {
       const tasksUrl = frontendUrl
         ? new URL('/tasks', frontendUrl).toString()
         : undefined;
+      const timeZone = await this.usersService.resolveTimezone(task.assigneeId);
       await this.zaloBotService.sendTextMessage(
         account.zaloUserId,
-        formatNewTaskMessage(task, tasksUrl),
+        formatNewTaskMessage(task, timeZone, tasksUrl),
       );
     } catch (error) {
       this.logger.error(
@@ -100,9 +123,12 @@ export class ZaloNotificationListener {
           task.assigneeId,
         );
         if (account) {
+          const timeZone = await this.usersService.resolveTimezone(
+            task.assigneeId,
+          );
           await this.zaloBotService.sendTextMessage(
             account.zaloUserId,
-            formatDeadlineMessage(task),
+            formatDeadlineMessage(task, timeZone),
           );
         }
       } catch (error) {

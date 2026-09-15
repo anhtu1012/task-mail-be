@@ -45,6 +45,37 @@ export class TimezoneUtil {
     return asUtc - at.getTime() + (at.getTime() % 1000);
   }
 
+  /**
+   * Turns wall-clock numbers ("20/09/2026 18:00") into the UTC instant they name
+   * **in `timeZone`**, regardless of what the server's own clock is set to.
+   *
+   * `new Date(y, m, d, h, min)` cannot be used for this: it reads the numbers in
+   * the server's local zone, so the same email produces a different instant on a
+   * UTC container than on a GMT+7 laptop.
+   */
+  static fromWallClock(
+    timeZone: string,
+    parts: {
+      year: number;
+      month: number;
+      day: number;
+      hour?: number;
+      minute?: number;
+    },
+  ): Date {
+    const naive = Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour ?? 0,
+      parts.minute ?? 0,
+    );
+    // Sample the offset twice: once near the naive instant, then again at the
+    // candidate result, so a DST change on that very day still lands right.
+    const guess = naive - this.offsetMs(timeZone, new Date(naive));
+    return new Date(naive - this.offsetMs(timeZone, new Date(guess)));
+  }
+
   /** `YYYY-MM-DD` as seen in `timeZone`. */
   static formatDateKey(at: Date, timeZone: string): string {
     const parts = new Intl.DateTimeFormat('en-CA', {
