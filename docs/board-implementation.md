@@ -15,7 +15,7 @@ những gì **khác** hoặc **cần biết thêm** so với đặc tả.
 | 6 | Xoá mềm được không? | **Được.** `Task.deletedAt`; `DELETE /tasks/:id` là xoá mềm, `POST /tasks/:id/restore` khôi phục cả checklist lẫn ghi chú (chúng không bị xoá). |
 | 7 | Mỗi người một bảng? | **Giữ** `Board.ownerId @unique`. Bảng được tạo tự động ở lần gọi API bảng đầu tiên, kèm 5 danh sách mặc định và gán toàn bộ task cũ theo `status`. |
 
-## Thay đổi phá vỡ tương thích — cần frontend sửa
+## Thay đổi phá vỡ tương thích — cần frontend sửaaa
 
 **`PATCH /tasks/:id/complete` đổi hình dạng response.**
 
