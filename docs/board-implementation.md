@@ -47,8 +47,38 @@ nguyên.
 - **Nhãn tạo slug tự động** từ tên (`Báo giá` → `baogia`), unique theo bảng.
 - **WIP là cảnh báo.** Vượt giới hạn trả 200 kèm `warning: "LIST_WIP_EXCEEDED"`,
   không chặn thao tác kéo thả.
-- **`?undo=true`** trên `move`, `snooze`, `PATCH /checklist-items/:id` để bỏ ghi
-  nhật ký khi người dùng bấm Ctrl+Z.
+- **`?undo=true`** trên **mọi endpoint ghi** để bỏ bước ghi nhật ký khi người
+  dùng bấm Ctrl+Z — kể cả endpoint chưa ghi nhật ký (`PATCH /lists/:id`,
+  `POST /tasks/:id/restore`), vì `forbidNonWhitelisted` sẽ trả 400 nếu không
+  nhận, và frontend không nên phải nhớ endpoint nào được gửi cờ.
+  `complete?undo=true` còn **không sinh lại thẻ lặp**, tránh nhân đôi thẻ kế
+  tiếp khi người dùng redo một thao tác hoàn thành.
+- **`PATCH /tasks/:id` ghi `DUE_CHANGED`** khi `deadline` đổi. Các trường khác
+  không ghi nhật ký.
+
+## Script vận hành
+
+```bash
+npm run build
+npm run check:migration                          # kiểm tra trước khi chạy migration
+node dist/scripts/backfill-boards.js --dry-run   # xem sẽ tạo bảng cho ai
+npm run backfill:boards                          # dựng bảng cho toàn bộ user
+```
+
+**`check:migration`** (chỉ đọc) kiểm đúng ba rủi ro khi chạy migration ngoài dev:
+quyền tạo extension `unaccent`, kiểu cột `tasks.description` (nếu chưa phải
+`text` thì `ALTER` sẽ khoá bảng), và số người dùng chưa có bảng. Thoát khác 0 khi
+có vấn đề chặn, nên cắm được vào pipeline deploy.
+
+**`backfill:boards`** dựng sẵn bảng cho mọi người. Bảng vốn được tạo **lười** ở
+lần gọi API bảng đầu tiên, và lần đó cũng gán `position` cho toàn bộ task cũ —
+với tài khoản vài trăm task thì người dùng đầu tiên phải gánh độ trễ đó. Chạy
+lại được nhiều lần: ai đã có bảng thì bỏ qua.
+
+> Cả hai script khởi động `ScriptModule` chứ **không** phải `AppModule`.
+> `AppModule` kéo theo `ScheduleModule` và ba cron job thật: ingest Gmail (tạo
+> task), nhắc deadline qua Zalo (gửi tin nhắn), và keep-alive ping. Một script
+> bảo trì chạy vài phút không được phép kích hoạt những thứ đó.
 
 ## Endpoint thêm ngoài đặc tả
 

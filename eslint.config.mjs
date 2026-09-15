@@ -29,7 +29,14 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      "prettier/prettier": ["error", { endOfLine: "auto" }],
+      // A controller sometimes has to declare a parameter purely so Nest
+      // validates it (an accepted-but-unused query DTO, say). Prefixing with
+      // `_` marks that intent instead of deleting the declaration.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
   {

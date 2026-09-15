@@ -11,8 +11,10 @@ import { DeadlineUtil } from '../../common/utils/deadline.util';
 import { RichTextUtil } from '../../common/utils/rich-text.util';
 import { NotFoundException } from '../../common/exceptions/not-found.exception';
 import { ForbiddenException } from '../../common/exceptions/forbidden.exception';
+import { ActivityAction } from '../../generated/prisma/enums';
 import { BoardAccessService } from '../board/services/board-access.service';
 import { BoardService } from '../board/services/board.service';
+import { ActivityService } from '../board/services/activity.service';
 import { TaskRepository } from './repositories/task.repository';
 import {
   CreateTaskDto,
@@ -34,6 +36,7 @@ export class TasksService {
     private readonly eventEmitter: EventEmitter2,
     private readonly boardAccess: BoardAccessService,
     private readonly boardService: BoardService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async list(
@@ -127,6 +130,7 @@ export class TasksService {
     user: JwtAccessPayload,
     id: string,
     dto: UpdateTaskDto,
+    undo = false,
   ): Promise<TaskResponseDto> {
     const task = await this.findOrThrow(id);
     this.assertCanAccess(task, user);
@@ -174,6 +178,20 @@ export class TasksService {
 
     if (dto.labelIds) {
       await this.taskRepository.setLabels(id, [...new Set(dto.labelIds)]);
+    }
+
+    // Changing the due date is the one edit worth a log line — it is what the
+    // user looks back at when wondering why something slipped.
+    const deadlineChanged =
+      updated.deadline?.getTime() !== task.deadline?.getTime();
+    if (deadlineChanged && !undo) {
+      const timeZone = await this.boardAccess.resolveTimezone(user.sub);
+      await this.activityService.record(
+        id,
+        ActivityAction.DUE_CHANGED,
+        this.activityService.dueChanged(updated.deadline, timeZone),
+        { from: task.deadline, to: updated.deadline },
+      );
     }
 
     return this.toResponse(updated);

@@ -308,6 +308,7 @@ export class BoardCardService {
   async complete(
     userId: string,
     cardId: string,
+    undo = false,
   ): Promise<CompleteCardResponseDto> {
     const { board, card } = await this.access.requireCard(userId, cardId);
     const now = new Date();
@@ -324,6 +325,13 @@ export class BoardCardService {
         : {}),
     });
 
+    if (undo) {
+      // Replaying a completion the user had undone: the repeat card spawned by
+      // the original completion still exists, so spawning another would leave
+      // two copies of the next occurrence behind.
+      return { completed: await this.summaryOf(card.id), next: null };
+    }
+
     await this.activity.record(
       card.id,
       ActivityAction.CARD_COMPLETED,
@@ -337,17 +345,23 @@ export class BoardCardService {
     };
   }
 
-  async reopen(userId: string, cardId: string): Promise<CardSummaryDto> {
+  async reopen(
+    userId: string,
+    cardId: string,
+    undo = false,
+  ): Promise<CardSummaryDto> {
     const { card } = await this.access.requireCard(userId, cardId);
     await this.cardRepository.update(card.id, {
       status: TaskStatus.TODO,
       completedAt: null,
     });
-    await this.activity.record(
-      card.id,
-      ActivityAction.CARD_REOPENED,
-      'Mở lại việc',
-    );
+    if (!undo) {
+      await this.activity.record(
+        card.id,
+        ActivityAction.CARD_REOPENED,
+        'Mở lại việc',
+      );
+    }
     return this.summaryOf(card.id);
   }
 

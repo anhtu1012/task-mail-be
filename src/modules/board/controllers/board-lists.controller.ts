@@ -24,6 +24,7 @@ import {
   CreateCardDto,
   ListCardsQueryDto,
   MoveListDto,
+  UndoFlagQueryDto,
   UpdateListDto,
 } from '../dto/board-request.dto';
 import {
@@ -53,6 +54,9 @@ export class BoardListsController {
     @CurrentUser() user: RequestWithUser['user'],
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() dto: UpdateListDto,
+    // Sửa danh sách không ghi `TaskActivity` (nhật ký gắn với từng việc, không
+    // gắn với cột), nên cờ này là no-op — nhận để frontend gửi đồng loạt.
+    @Query() _flags: UndoFlagQueryDto,
   ): Promise<TaskListDto> {
     return this.listService.update(user.sub, id, dto);
   }
