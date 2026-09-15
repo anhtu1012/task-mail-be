@@ -37,6 +37,69 @@ describe('TimezoneUtil', () => {
     expect(TimezoneUtil.formatDateKey(at, VN)).toBe('2026-09-16');
   });
 
+  describe('fromWallClock', () => {
+    // "Hạn: 20/09/2026 18:00" in a mail means 18:00 in Vietnam, which is
+    // 11:00 UTC — not 18:00 UTC, whatever the server's own clock says.
+    it('reads wall-clock numbers in the given zone, not the server one', () => {
+      const original = process.env.TZ;
+      const read = () =>
+        TimezoneUtil.fromWallClock(VN, {
+          year: 2026,
+          month: 9,
+          day: 20,
+          hour: 18,
+          minute: 0,
+        }).toISOString();
+
+      try {
+        process.env.TZ = 'UTC';
+        expect(read()).toBe('2026-09-20T11:00:00.000Z');
+        process.env.TZ = 'Asia/Ho_Chi_Minh';
+        expect(read()).toBe('2026-09-20T11:00:00.000Z');
+        process.env.TZ = 'America/New_York';
+        expect(read()).toBe('2026-09-20T11:00:00.000Z');
+      } finally {
+        process.env.TZ = original;
+      }
+    });
+
+    it('defaults a missing time to midnight local', () => {
+      const at = TimezoneUtil.fromWallClock(VN, {
+        year: 2026,
+        month: 8,
+        day: 1,
+      });
+      expect(at.toISOString()).toBe('2026-07-31T17:00:00.000Z');
+      expect(TimezoneUtil.formatDateKey(at, VN)).toBe('2026-08-01');
+    });
+
+    it('round-trips with formatDateKey', () => {
+      const at = TimezoneUtil.fromWallClock(VN, {
+        year: 2026,
+        month: 9,
+        day: 20,
+        hour: 6,
+        minute: 0,
+      });
+      expect(TimezoneUtil.formatDateKey(at, VN)).toBe('2026-09-20');
+      const { start, end } = TimezoneUtil.dayRange(VN, '2026-09-20');
+      expect(at >= start && at < end).toBe(true);
+    });
+
+    it('handles a zone with DST', () => {
+      // 02:30 on 2026-03-29 does not exist in Berlin (clocks jump 02:00 -> 03:00);
+      // the result must still be a real instant, not NaN.
+      const at = TimezoneUtil.fromWallClock('Europe/Berlin', {
+        year: 2026,
+        month: 3,
+        day: 29,
+        hour: 2,
+        minute: 30,
+      });
+      expect(Number.isNaN(at.getTime())).toBe(false);
+    });
+  });
+
   it('rejects an unknown zone', () => {
     expect(TimezoneUtil.isValid(VN)).toBe(true);
     expect(TimezoneUtil.isValid('Mars/Olympus_Mons')).toBe(false);

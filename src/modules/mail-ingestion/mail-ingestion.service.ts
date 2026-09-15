@@ -15,6 +15,7 @@ import { ZaloAccountRepository } from '../zalo/repositories/zalo-account.reposit
 import { MailConfig } from '../../config/mail.config';
 import { SecurityConfig } from '../../config/security.config';
 import { EncryptionUtil } from '../../common/utils/encryption.util';
+import { TimezoneUtil } from '../../common/utils/timezone.util';
 import { TaskCategory } from '../../common/enums/task-category.enum';
 import { parseTaskMail } from './parsers/task-mail.parser';
 
@@ -281,6 +282,14 @@ export class MailIngestionService {
             parsedTask.assigneeEmail,
             mailboxOwnerId,
           );
+          // "Hạn: 20/09/2026 18:00" means 18:00 where the assignee lives, not
+          // 18:00 on the server's clock — the container runs UTC.
+          const deadline = parsedTask.deadline
+            ? TimezoneUtil.fromWallClock(
+                await this.usersService.resolveTimezone(assigneeId),
+                parsedTask.deadline,
+              )
+            : undefined;
           const receivedAt = data.internalDate
             ? new Date(Number(data.internalDate))
             : new Date();
@@ -293,7 +302,7 @@ export class MailIngestionService {
             assigneeId,
             title: parsedTask.title,
             description: parsedTask.description,
-            deadline: parsedTask.deadline,
+            deadline,
             priority: parsedTask.priority,
             category: TaskCategory.WORK,
             attachments,

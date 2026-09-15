@@ -4,14 +4,12 @@ import { ERROR_CODES } from '../../../common/constants/error-codes.constants';
 import {
   DEFAULT_BOARD_TITLE,
   DEFAULT_LISTS,
-  DEFAULT_TIMEZONE,
   POSITION_GAP,
 } from '../../../common/constants/board.constants';
 import { NotFoundException } from '../../../common/exceptions/not-found.exception';
-import { TimezoneUtil } from '../../../common/utils/timezone.util';
 import { BoardRepository } from '../repositories/board.repository';
 import { BoardCardRepository } from '../repositories/board-card.repository';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { UsersService } from '../../users/users.service';
 
 /**
  * Ownership and lookup helpers shared by every board service.
@@ -27,7 +25,7 @@ export class BoardAccessService {
   constructor(
     private readonly boardRepository: BoardRepository,
     private readonly cardRepository: BoardCardRepository,
-    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
   ) {}
 
   /** The caller's board, seeded with default lists on first access. */
@@ -126,16 +124,11 @@ export class BoardAccessService {
   /**
    * `?tz=` wins, then the user profile, then the app default. Cutting the day
    * on the server's UTC clock would drop early-morning tasks for GMT+7 users.
+   *
+   * Delegates so that the board, mail ingestion and the Zalo reminders all read
+   * a user's zone the same way.
    */
-  async resolveTimezone(userId: string, requested?: string): Promise<string> {
-    if (requested && TimezoneUtil.isValid(requested)) return requested;
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { timezone: true },
-    });
-    if (user?.timezone && TimezoneUtil.isValid(user.timezone)) {
-      return user.timezone;
-    }
-    return DEFAULT_TIMEZONE;
+  resolveTimezone(userId: string, requested?: string): Promise<string> {
+    return this.usersService.resolveTimezone(userId, requested);
   }
 }
