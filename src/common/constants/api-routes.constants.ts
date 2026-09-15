@@ -13,6 +13,42 @@ export const API_ROUTES = {
     ROOT: 'tasks',
     STATS: 'stats',
     COMPLETE: 'complete',
+    MOVE: 'move',
+    SNOOZE: 'snooze',
+    DETAIL: 'detail',
+    RESTORE: 'restore',
+    LABELS: 'labels',
+    CHECKLISTS: 'checklists',
+    NOTES: 'notes',
+    ATTACHMENTS: 'attachments',
+  },
+  BOARDS: {
+    ROOT: 'boards',
+    ME_FULL: 'me/full',
+    ME_TODAY: 'me/today',
+    ME_AGENDA: 'me/agenda',
+    ME_SEARCH: 'me/search',
+    LISTS: 'lists',
+    LABELS: 'labels',
+  },
+  LISTS: {
+    ROOT: 'lists',
+    MOVE: 'move',
+    REBALANCE: 'rebalance',
+    CARDS: 'cards',
+  },
+  CHECKLISTS: {
+    ROOT: 'checklists',
+    ITEMS: 'items',
+  },
+  CHECKLIST_ITEMS: {
+    ROOT: 'checklist-items',
+  },
+  NOTES: {
+    ROOT: 'notes',
+  },
+  ATTACHMENTS: {
+    ROOT: 'attachments',
   },
   TASK_TYPES: {
     ROOT: 'task-types',

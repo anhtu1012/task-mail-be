@@ -7,8 +7,12 @@ import { TaskCategory } from '../../common/enums/task-category.enum';
 import { Role } from '../../common/enums/role.enum';
 import { JwtAccessPayload } from '../../common/types/jwt-payload.type';
 import { PaginationUtil } from '../../common/utils/pagination.util';
+import { DeadlineUtil } from '../../common/utils/deadline.util';
+import { RichTextUtil } from '../../common/utils/rich-text.util';
 import { NotFoundException } from '../../common/exceptions/not-found.exception';
 import { ForbiddenException } from '../../common/exceptions/forbidden.exception';
+import { BoardAccessService } from '../board/services/board-access.service';
+import { BoardService } from '../board/services/board.service';
 import { TaskRepository } from './repositories/task.repository';
 import {
   CreateTaskDto,
@@ -28,6 +32,8 @@ export class TasksService {
   constructor(
     private readonly taskRepository: TaskRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly boardAccess: BoardAccessService,
+    private readonly boardService: BoardService,
   ) {}
 
   async list(
@@ -83,9 +89,16 @@ export class TasksService {
       );
     }
 
+    // Tasks created here land in the assignee's Inbox (listId stays null) —
+    // the board screen is where they get filed into a column.
+    const board = await this.boardAccess.ensureBoard(assigneeId);
+    if (dto.labelIds?.length) {
+      await this.boardService.assertLabelsInBoard(board.id, dto.labelIds);
+    }
+
     const task = await this.taskRepository.create({
       title: dto.title,
-      description: dto.description,
+      description: RichTextUtil.sanitize(dto.description),
       note: dto.note,
       taskTypeId: dto.taskTypeId,
       category: dto.category,
@@ -93,9 +106,18 @@ export class TasksService {
       attachments: dto.attachments,
       assigneeId,
       creatorId: user.sub,
+      boardId: board.id,
+      cover: dto.cover,
+      estimateMinutes: dto.estimateMinutes,
+      repeatUnit: dto.repeat?.unit ?? null,
+      repeatInterval: dto.repeat?.interval ?? null,
       assignedAt: dto.assignedAt ? new Date(dto.assignedAt) : undefined,
       deadline: dto.deadline ? new Date(dto.deadline) : undefined,
     });
+
+    if (dto.labelIds?.length) {
+      await this.taskRepository.setLabels(task.id, [...new Set(dto.labelIds)]);
+    }
 
     this.emitTaskCreated(task);
     return this.toResponse(task);
@@ -120,14 +142,26 @@ export class TasksService {
     const completingNow =
       dto.status === TaskStatus.DONE && !task.completedAt && !dto.completedAt;
 
+    if (dto.labelIds && task.boardId) {
+      await this.boardService.assertLabelsInBoard(task.boardId, dto.labelIds);
+    }
+
     const updated = await this.taskRepository.update(id, {
       title: dto.title,
-      description: dto.description,
+      // Descriptions are Quill HTML and can originate from an ingested email,
+      // so they are sanitised on write — never trusting the client's filtering.
+      description: RichTextUtil.sanitize(dto.description),
       note: dto.note,
       taskTypeId: dto.taskTypeId,
       category: dto.category,
       priority: dto.priority,
       attachments: dto.attachments,
+      cover: dto.cover,
+      estimateMinutes: dto.estimateMinutes,
+      repeatUnit:
+        dto.repeat === undefined ? undefined : (dto.repeat?.unit ?? null),
+      repeatInterval:
+        dto.repeat === undefined ? undefined : (dto.repeat?.interval ?? null),
       assignedAt: dto.assignedAt ? new Date(dto.assignedAt) : undefined,
       deadline: dto.deadline ? new Date(dto.deadline) : undefined,
       status: dto.status,
@@ -138,25 +172,18 @@ export class TasksService {
           : undefined,
     });
 
-    return this.toResponse(updated);
-  }
-
-  async complete(user: JwtAccessPayload, id: string): Promise<TaskResponseDto> {
-    const task = await this.findOrThrow(id);
-    this.assertCanAccess(task, user);
-
-    const updated = await this.taskRepository.update(id, {
-      status: TaskStatus.DONE,
-      completedAt: new Date(),
-    });
+    if (dto.labelIds) {
+      await this.taskRepository.setLabels(id, [...new Set(dto.labelIds)]);
+    }
 
     return this.toResponse(updated);
   }
 
+  /** Soft delete, so `POST /tasks/:id/restore` can bring the task back. */
   async remove(user: JwtAccessPayload, id: string): Promise<void> {
     const task = await this.findOrThrow(id);
     this.assertCanAccess(task, user);
-    await this.taskRepository.delete(id);
+    await this.taskRepository.softDelete(id);
   }
 
   async getStats(
@@ -225,9 +252,15 @@ export class TasksService {
     externalSyncStatus: string;
     sourceMailAccountId?: string;
   }): Promise<TaskResponseDto> {
+    // Auto-created work goes straight to the owner's Inbox (listId null), which
+    // is exactly what `boardId` set + `listId` null means on the board screen.
+    const board = await this.boardAccess.ensureBoard(input.assigneeId);
+
     const task = await this.taskRepository.create({
       title: input.title,
-      description: input.description,
+      // HTML written by whoever sent the mail — sanitised before it is stored.
+      description: RichTextUtil.sanitize(input.description),
+      boardId: board.id,
       priority: input.priority,
       category: input.category ?? TaskCategory.WORK,
       attachments: input.attachments,
@@ -278,17 +311,7 @@ export class TasksService {
   }
 
   private computeDeadlineStatus(task: Task): DeadlineStatus {
-    if (task.status === TaskStatus.DONE) {
-      if (
-        !task.deadline ||
-        !task.completedAt ||
-        task.completedAt <= task.deadline
-      )
-        return 'ON_TIME';
-      return 'LATE';
-    }
-    if (task.deadline && task.deadline.getTime() < Date.now()) return 'LATE';
-    return 'IN_PROGRESS';
+    return DeadlineUtil.compute(task);
   }
 
   private toResponse(task: Task): TaskResponseDto {

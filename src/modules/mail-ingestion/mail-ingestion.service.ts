@@ -74,7 +74,8 @@ function extractPlainText(payload?: gmail_v1.Schema$MessagePart): string {
   if (plainPart?.body?.data) return decodeBase64Url(plainPart.body.data);
 
   const htmlPart = findPartByMimeType(payload, 'text/html');
-  if (htmlPart?.body?.data) return stripHtml(decodeBase64Url(htmlPart.body.data));
+  if (htmlPart?.body?.data)
+    return stripHtml(decodeBase64Url(htmlPart.body.data));
 
   return '';
 }

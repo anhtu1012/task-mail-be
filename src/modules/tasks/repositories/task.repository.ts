@@ -3,6 +3,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import type { Task } from '../../../generated/prisma/client';
 import {
+  RepeatUnit,
   TaskCategory,
   TaskPriority,
   TaskStatus,
@@ -22,7 +23,7 @@ export type TaskFilter = {
 
 export type CreateTaskInput = {
   title: string;
-  description?: string;
+  description?: string | null;
   note?: string;
   taskTypeId?: string;
   category?: TaskCategory;
@@ -35,6 +36,11 @@ export type CreateTaskInput = {
   externalRef?: string;
   externalSyncStatus?: string;
   sourceMailAccountId?: string;
+  boardId?: string;
+  cover?: string | null;
+  estimateMinutes?: number | null;
+  repeatUnit?: RepeatUnit | null;
+  repeatInterval?: number | null;
 };
 
 export type UpdateTaskInput = Partial<
@@ -42,10 +48,13 @@ export type UpdateTaskInput = Partial<
 > & {
   status?: TaskStatus;
   completedAt?: Date | null;
+  deletedAt?: Date | null;
 };
 
 function buildWhere(filter: TaskFilter): Prisma.TaskWhereInput {
   return {
+    // Soft-deleted cards stay in the table for Ctrl+Z but are invisible here.
+    deletedAt: null,
     assigneeId: filter.assigneeId,
     status: filter.status,
     priority: filter.priority,
@@ -77,11 +86,13 @@ export class TaskRepository {
   }
 
   findById(id: string): Promise<Task | null> {
-    return this.prisma.task.findUnique({ where: { id } });
+    return this.prisma.task.findFirst({ where: { id, deletedAt: null } });
   }
 
   findByExternalRef(externalRef: string): Promise<Task | null> {
-    return this.prisma.task.findFirst({ where: { externalRef } });
+    return this.prisma.task.findFirst({
+      where: { externalRef, deletedAt: null },
+    });
   }
 
   create(input: CreateTaskInput): Promise<Task> {
@@ -92,18 +103,34 @@ export class TaskRepository {
     return this.prisma.task.update({ where: { id }, data: input });
   }
 
-  delete(id: string): Promise<Task> {
-    return this.prisma.task.delete({ where: { id } });
+  /** Replaces the task's board labels wholesale. */
+  async setLabels(taskId: string, labelIds: string[]): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.taskLabel.deleteMany({ where: { taskId } }),
+      this.prisma.taskLabel.createMany({
+        data: labelIds.map((labelId) => ({ taskId, labelId })),
+        skipDuplicates: true,
+      }),
+    ]);
+  }
+
+  /** Soft delete: the row survives so `POST /tasks/:id/restore` can undo it. */
+  softDelete(id: string): Promise<Task> {
+    return this.prisma.task.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
   countTotal(assigneeId: string): Promise<number> {
-    return this.prisma.task.count({ where: { assigneeId } });
+    return this.prisma.task.count({ where: { assigneeId, deletedAt: null } });
   }
 
   countCompleted(assigneeId: string, since?: Date): Promise<number> {
     return this.prisma.task.count({
       where: {
         assigneeId,
+        deletedAt: null,
         status: TaskStatus.DONE,
         completedAt: since ? { gte: since } : undefined,
       },
@@ -119,6 +146,7 @@ export class TaskRepository {
     const completed = await this.prisma.task.findMany({
       where: {
         assigneeId,
+        deletedAt: null,
         status: TaskStatus.DONE,
         completedAt: since ? { gte: since } : undefined,
       },
@@ -134,6 +162,7 @@ export class TaskRepository {
     const threshold = new Date(now.getTime() + hours * 60 * 60 * 1000);
     return this.prisma.task.findMany({
       where: {
+        deletedAt: null,
         deadline: { gte: now, lte: threshold },
         status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] },
         deadlineNotifiedAt: null,
