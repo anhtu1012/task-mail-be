@@ -40,6 +40,9 @@ model User {
   // Groundwork for multi-tenant support: nullable today, made required
   // and indexed once tenant isolation is introduced.
   tenantId     String?      @map("tenant_id")
+  // IANA zone (e.g. "Asia/Ho_Chi_Minh") used to cut "today" for the board
+  // agenda/metrics; falls back to the app default when unset.
+  timezone     String?      @map("timezone")
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
@@ -50,6 +53,7 @@ model User {
   mailAccounts      MailAccount[]
   zaloAccount       ZaloAccount?
   zaloLinkCodes     ZaloLinkCode[]
+  board             Board?
 
   @@index([email])
   @@map("users")
@@ -155,6 +159,22 @@ model Task {
   // Set once a Zalo deadline reminder has fired, so the hourly cron never re-notifies.
   deadlineNotifiedAt DateTime? @map("deadline_notified_at")
 
+  // --- Personal board (see docs board-spec) ---
+  boardId String? @map("board_id")
+  // null = sitting in the Inbox (auto-ingested, not filed into a list yet).
+  listId  String? @map("list_id")
+  // Sparse float ordering: dropping between two cards writes the average of
+  // their positions, so a reorder only ever updates one row.
+  position Float  @default(1024)
+  // CSS gradient or image URL rendered as the card cover.
+  cover           String? @map("cover")
+  estimateMinutes Int?    @map("estimate_minutes")
+  repeatUnit      RepeatUnit? @map("repeat_unit")
+  repeatInterval  Int?        @map("repeat_interval")
+  // Soft delete, so the frontend's Ctrl+Z can restore a card with its
+  // checklists and notes intact.
+  deletedAt DateTime? @map("deleted_at")
+
   tenantId  String?  @map("tenant_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -164,11 +184,186 @@ model Task {
   creator           User?        @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   sourceMailAccount MailAccount? @relation(fields: [sourceMailAccountId], references: [id], onDelete: SetNull)
 
+  board           Board?           @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  list            TaskList?        @relation(fields: [listId], references: [id], onDelete: SetNull)
+  labels          TaskLabel[]
+  checklists      Checklist[]
+  attachmentFiles TaskAttachment[]
+  notes           TaskNote[]
+  activities      TaskActivity[]
+
   @@index([assigneeId])
   @@index([status])
   @@index([deadline])
   @@index([sourceMailAccountId])
+  @@index([listId, position])
+  @@index([boardId, listId])
+  @@index([boardId, deadline])
   @@map("tasks")
+}
+
+enum RepeatUnit {
+  DAY
+  WEEK
+  MONTH
+}
+
+/// One board per user for now (`ownerId @unique`). Dropping that constraint
+/// later is cheap; adding it back once rows exist is not.
+model Board {
+  id        String   @id @default(uuid())
+  ownerId   String   @unique @map("owner_id")
+  title     String
+  starred   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner  User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  lists  TaskList[]
+  labels BoardLabel[]
+  tasks  Task[]
+
+  @@map("boards")
+}
+
+model TaskList {
+  id       String  @id @default(uuid())
+  boardId  String  @map("board_id")
+  title    String
+  position Float
+  archived Boolean @default(false)
+  wipLimit Int?    @map("wip_limit")
+  // When set, moving a card into this list rewrites Task.status, keeping the
+  // legacy /kanban + stats screens correct. null = the list does not touch status.
+  mapsToStatus TaskStatus? @map("maps_to_status")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@index([boardId, position])
+  @@map("task_lists")
+}
+
+model BoardLabel {
+  id      String @id @default(uuid())
+  boardId String @map("board_id")
+  name    String
+  color   String
+  // Diacritic-free form the frontend quick-add matches ("#baogia").
+  slug    String
+
+  board Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks TaskLabel[]
+
+  @@unique([boardId, slug])
+  @@index([boardId])
+  @@map("board_labels")
+}
+
+model TaskLabel {
+  taskId  String @map("task_id")
+  labelId String @map("label_id")
+
+  task  Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label BoardLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@index([labelId])
+  @@map("task_labels")
+}
+
+model Checklist {
+  id        String   @id @default(uuid())
+  taskId    String   @map("task_id")
+  title     String
+  position  Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task  Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@index([taskId, position])
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id          String    @id @default(uuid())
+  checklistId String    @map("checklist_id")
+  content     String
+  checked     Boolean   @default(false)
+  position    Float
+  checkedAt   DateTime? @map("checked_at")
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId, position])
+  @@map("checklist_items")
+}
+
+enum AttachmentKind {
+  IMAGE
+  FILE
+  LINK
+}
+
+model TaskAttachment {
+  id        String         @id @default(uuid())
+  taskId    String         @map("task_id")
+  name      String
+  kind      AttachmentKind
+  url       String
+  sizeBytes Int?           @map("size_bytes")
+  isCover   Boolean        @default(false) @map("is_cover")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_attachments")
+}
+
+/// Personal note — no authorId: the board owner is always the author.
+model TaskNote {
+  id        String    @id @default(uuid())
+  taskId    String    @map("task_id")
+  content   String
+  createdAt DateTime  @default(now()) @map("created_at")
+  editedAt  DateTime? @map("edited_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_notes")
+}
+
+enum ActivityAction {
+  CARD_CREATED
+  CARD_MOVED
+  CARD_COMPLETED
+  CARD_REOPENED
+  DUE_CHANGED
+  SNOOZED
+  CHECKLIST_ITEM_CHECKED
+  ATTACHMENT_ADDED
+  NOTE_ADDED
+}
+
+/// Own-actions log — no actorId: the board owner is always the actor.
+model TaskActivity {
+  id     String         @id @default(uuid())
+  taskId String         @map("task_id")
+  action ActivityAction
+  // Pre-rendered Vietnamese sentence, frozen at write time so renaming a list
+  // later does not rewrite history.
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_activities")
 }
 
 enum MailProvider {

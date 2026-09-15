@@ -1,4 +1,5 @@
 import { ApiPropertyOptional, ApiProperty, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
@@ -7,8 +8,11 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { CardRepeatDtoInput } from '../../board/dto/board-request.dto';
 import { TaskPriority } from '../../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../../common/enums/task-status.enum';
 import { TaskCategory } from '../../../common/enums/task-category.enum';
@@ -70,6 +74,36 @@ export class CreateTaskDto {
   @IsArray()
   @IsString({ each: true })
   attachments?: string[];
+
+  @ApiPropertyOptional({ description: 'CSS gradient hoặc URL ảnh bìa' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  cover?: string;
+
+  @ApiPropertyOptional({ description: 'Thời lượng dự kiến, phút' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  estimateMinutes?: number;
+
+  @ApiPropertyOptional({
+    type: CardRepeatDtoInput,
+    description: 'null = việc một lần',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CardRepeatDtoInput)
+  repeat?: CardRepeatDtoInput | null;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Nhãn của bảng — thay thế toàn bộ nhãn hiện có của việc',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  labelIds?: string[];
 }
 
 export class UpdateTaskDto extends PartialType(CreateTaskDto) {

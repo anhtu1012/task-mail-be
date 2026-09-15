@@ -1,6 +1,8 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TasksService } from './tasks.service';
 import type { TaskRepository } from './repositories/task.repository';
+import type { BoardAccessService } from '../board/services/board-access.service';
+import type { BoardService } from '../board/services/board.service';
 import { Role } from '../../common/enums/role.enum';
 import { TaskPriority } from '../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../common/enums/task-status.enum';
@@ -39,8 +41,19 @@ describe('TasksService', () => {
       create: jest.fn().mockResolvedValue(baseTask),
     } as unknown as TaskRepository;
     const eventEmitter = { emit: jest.fn() } as unknown as EventEmitter2;
-    const service = new TasksService(taskRepository, eventEmitter);
-    return { service, taskRepository, eventEmitter };
+    const boardAccess = {
+      ensureBoard: jest.fn().mockResolvedValue({ id: 'board-1' }),
+    } as unknown as BoardAccessService;
+    const boardService = {
+      assertLabelsInBoard: jest.fn().mockResolvedValue(undefined),
+    } as unknown as BoardService;
+    const service = new TasksService(
+      taskRepository,
+      eventEmitter,
+      boardAccess,
+      boardService,
+    );
+    return { service, taskRepository, eventEmitter, boardAccess };
   }
 
   it('emits task.created after creating a task via the API path', async () => {

@@ -94,18 +94,11 @@ export class TasksController {
     return this.tasksService.update(user, id, dto);
   }
 
-  @Patch(`:id/${API_ROUTES.TASKS.COMPLETE}`)
-  @ApiOperation({ summary: 'Mark a task as completed now' })
-  @ApiResponse({ status: HttpStatus.OK, type: TaskResponseDto })
-  complete(
-    @CurrentUser() user: RequestWithUser['user'],
-    @Param('id', ParseObjectIdPipe) id: string,
-  ): Promise<TaskResponseDto> {
-    return this.tasksService.complete(user, id);
-  }
+  // PATCH :id/complete lives in BoardCardsController: completing a repeating
+  // task also has to spawn the next occurrence and return it as `next`.
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a task' })
+  @ApiOperation({ summary: 'Delete a task (soft delete — restorable)' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
