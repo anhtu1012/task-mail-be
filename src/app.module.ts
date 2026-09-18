@@ -12,6 +12,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { BoardModule } from './modules/board/board.module';
+import { PreferencesModule } from './modules/preferences/preferences.module';
 import { MailAccountsModule } from './modules/mail-accounts/mail-accounts.module';
 import { MailIngestionModule } from './modules/mail-ingestion/mail-ingestion.module';
 import { ZaloModule } from './modules/zalo/zalo.module';
@@ -30,6 +31,7 @@ import { KeepAliveService } from './common/keep-alive/keep-alive.service';
     AuthModule,
     TasksModule,
     BoardModule,
+    PreferencesModule,
     MailAccountsModule,
     MailIngestionModule,
     ZaloModule,

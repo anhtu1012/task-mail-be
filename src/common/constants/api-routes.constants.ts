@@ -9,6 +9,10 @@ export const API_ROUTES = {
     GOOGLE: 'google',
     GOOGLE_CALLBACK: 'google/callback',
   },
+  PREFERENCES: {
+    ROOT: 'me/preferences',
+    THEME: 'theme',
+  },
   TASKS: {
     ROOT: 'tasks',
     STATS: 'stats',

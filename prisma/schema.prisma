@@ -54,9 +54,32 @@ model User {
   zaloAccount       ZaloAccount?
   zaloLinkCodes     ZaloLinkCode[]
   board             Board?
+  themePreference   UserThemePreference?
 
   @@index([email])
   @@map("users")
+}
+
+/// Giao diện người dùng tự chỉnh (ảnh nền, màu nhấn, độ trong của khung).
+/// Quan hệ 1–1 nên `userId` làm luôn khoá chính — không có cột `id` riêng.
+model UserThemePreference {
+  userId     String @id @map("user_id")
+  /// id preset nền do frontend định nghĩa. Cố tình là chuỗi chứ không phải
+  /// enum: thêm một ảnh nền ở FE mà phải chạy migration đổi enum là ràng
+  /// buộc chéo không đáng có.
+  background String @db.VarChar(40)
+  /// `#rrggbb`. VarChar chứ không phải Char(7): Postgres `char` đệm/cắt
+  /// khoảng trắng, mà FE so sánh chuỗi để tô ô màu đang chọn.
+  accent     String @db.VarChar(7)
+  /// Double chứ không phải Decimal: driver trả `numeric` về dạng chuỗi
+  /// ("0.70"), còn hợp đồng với FE yêu cầu JSON number.
+  surfaceOpacity Float    @map("surface_opacity")
+  surfaceBlur    Int      @map("surface_blur") @db.SmallInt
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_theme_preferences")
 }
 
 model RefreshToken {
