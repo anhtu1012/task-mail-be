@@ -286,6 +286,33 @@ Sau khi user connect Gmail (mục 5), backend tự động:
   ```
 - `DELETE /zalo-accounts/me` — Bearer required → `204` (idempotent, gọi khi chưa link cũng không lỗi)
 
+## 6b. Module `preferences` (`/me/preferences`) — giao diện người dùng tự chỉnh
+
+Tất cả yêu cầu Bearer. Trần riêng 60 req/phút (mức chung 20/phút quá sát vì lần
+`GET` rơi đúng lúc đăng nhập).
+
+- `GET /me/preferences/theme` → **luôn `200`**, kể cả khi user chưa từng lưu:
+  ```ts
+  {
+    theme: { background: string; accent: string; surfaceOpacity: number; surfaceBlur: number };
+    source: 'user' | 'default';   // 'default' = chưa có bản ghi, đang trả mặc định hệ thống
+    updatedAt: string | null;     // null khi source = 'default'
+  }
+  ```
+  **Không bao giờ trả `404`** — FE dùng `404` để nhận ra endpoint chưa deploy và
+  tắt hẳn việc gọi API trong cả phiên.
+- `PUT /me/preferences/theme` — body đúng object `theme` (bốn trường, không bọc)
+  → `200` trả bản ghi sau khi lưu, `source` luôn `'user'`.
+- `DELETE /me/preferences/theme` → `204`, idempotent (gọi khi chưa có bản ghi
+  cũng `204`).
+
+Ràng buộc: `background` 1–40 ký tự `^[a-z0-9-]+$`; `accent` `^#[0-9a-fA-F]{6}$`
+(giữ nguyên hoa/thường); `surfaceOpacity` `0.5 ≤ x ≤ 1`; `surfaceBlur` số
+nguyên `0 ≤ x ≤ 28`.
+
+Sai ràng buộc → **`422` `VALIDATION_FAILED`** (không phải `400` như phần còn
+lại của API — đây là hợp đồng riêng với FE, xem `Validation422Filter`).
+
 ## 7. Module `zalo-bot` (`/zalo-bot`) — chỉ admin
 
 - `GET /zalo-bot/status` — Bearer + role ADMIN/SUPER_ADMIN → `200`:
@@ -307,4 +334,4 @@ Sau khi user connect Gmail (mục 5), backend tự động:
 - **Không có tính năng upload file thật** — trường `attachments` của task chỉ là mảng string (URL hoặc tên file lấy được từ email), không có endpoint `multipart/form-data` nào để FE upload file lên server. Nếu cần đính kèm file thủ công, FE chỉ có thể nhập URL, không thể upload binary.
 - **Chưa có tính năng quên/đặt lại mật khẩu** dù trong DB đã có sẵn bảng `PasswordResetOtp` — bảng này chưa được nối với bất kỳ controller nào, nên FE **không nên** làm màn hình "Quên mật khẩu" cho tới khi backend bổ sung endpoint tương ứng.
 - Chiến lược lưu access token phía FE: lưu in-memory/state (Redux, Context, hoặc React Query cache) là đủ; khi access token hết hạn (`401`), gọi `POST /auth/refresh-token` (tự động nhờ cookie) để lấy token mới rồi retry request — pattern interceptor chuẩn của axios.
-- Do bật `forbidNonWhitelisted`, khi build form/payload gửi lên, chỉ gửi đúng các field được liệt kê ở trên — thừa field sẽ bị từ chối với `400`.
+- Do bật `forbidNonWhitelisted`, khi build form/payload gửi lên, chỉ gửi đúng các field được liệt kê ở trên — thừa field sẽ bị từ chối với `400` (riêng `/me/preferences/theme` là `422`, xem mục 6b).

@@ -22,4 +22,7 @@ export const ERROR_CODES = {
   LIST_WIP_EXCEEDED: 'LIST_WIP_EXCEEDED',
   CARD_NOT_IN_BOARD: 'CARD_NOT_IN_BOARD',
   INVALID_TIMEZONE: 'INVALID_TIMEZONE',
+
+  /** Body sai ràng buộc trên controller gắn `Validation422Filter`. */
+  VALIDATION_FAILED: 'VALIDATION_FAILED',
 } as const;
