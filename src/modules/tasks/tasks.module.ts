@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BoardModule } from '../board/board.module';
+import { ProjectsModule } from '../projects/projects.module';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 import { TaskTypesController } from './task-types.controller';
@@ -8,7 +9,7 @@ import { TaskRepository } from './repositories/task.repository';
 import { TaskTypeRepository } from './repositories/task-type.repository';
 
 @Module({
-  imports: [BoardModule],
+  imports: [BoardModule, ProjectsModule],
   controllers: [TasksController, TaskTypesController],
   providers: [
     TasksService,

@@ -166,6 +166,20 @@ export class CreateCardDto {
   @IsString()
   @MaxLength(2000)
   cover?: string;
+
+  /**
+   * Chỉ dùng khi tạo thẳng vào Hộp thư đến (`POST /tasks/inbox/cards`): hộp thư
+   * đến không thuộc cột nào nên không suy ra được dự án. Tạo trong một cột
+   * (`POST /lists/:id/cards`) thì trường này bị bỏ qua — dự án suy từ bảng chứa
+   * cột, và đó mới là nguồn đúng.
+   */
+  @ApiPropertyOptional({
+    description:
+      'Chỉ có tác dụng ở /tasks/inbox/cards. Bỏ trống = dự án mặc định',
+  })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
 }
 
 export class MoveCardDto {
@@ -301,8 +315,22 @@ export class UpdateAttachmentDto {
   isCover?: boolean;
 }
 
+/**
+ * `?projectId=` trên mọi endpoint bảng.
+ *
+ * Bảng thuộc dự án, nên thiếu `projectId` thì không suy ra được bảng nào. Bỏ
+ * trống = dự án mặc định của người gọi — frontend luôn gửi, còn mặc định ở đây
+ * là để một lần gọi tay (curl, Swagger) không phải tra id trước.
+ */
+export class ProjectScopeQueryDto {
+  @ApiPropertyOptional({ description: 'Bỏ trống = dự án mặc định' })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+}
+
 /** `?tz=` on every endpoint that has to cut a day boundary (mục 4.5). */
-export class TimezoneQueryDto {
+export class TimezoneQueryDto extends ProjectScopeQueryDto {
   @ApiPropertyOptional({ example: 'Asia/Ho_Chi_Minh' })
   @IsOptional()
   @IsString()
@@ -329,7 +357,7 @@ export class BoardFullQueryDto extends TimezoneQueryDto {
   cardsPerList?: number;
 }
 
-export class ListCardsQueryDto {
+export class ListCardsQueryDto extends ProjectScopeQueryDto {
   @ApiPropertyOptional({
     description: 'position của thẻ cuối đã nhận — không phải số trang',
   })
@@ -347,7 +375,7 @@ export class ListCardsQueryDto {
   limit?: number;
 }
 
-export class SearchQueryDto {
+export class SearchQueryDto extends ProjectScopeQueryDto {
   @ApiProperty({ example: 'bao gia' })
   @IsString()
   @IsNotEmpty()

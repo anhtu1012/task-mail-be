@@ -12,6 +12,8 @@ import { PaginationParams } from '../../../common/types/pagination.type';
 
 export type TaskFilter = {
   assigneeId?: string;
+  /** Lớp phân vùng. Bỏ trống = mọi dự án (xem `TasksService.list`). */
+  projectId?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
   category?: TaskCategory;
@@ -30,6 +32,8 @@ export type CreateTaskInput = {
   priority?: TaskPriority;
   attachments?: string[];
   assigneeId: string;
+  /** Bắt buộc: mọi việc đều thuộc đúng một dự án, không có ngoại lệ. */
+  projectId: string;
   creatorId?: string;
   assignedAt?: Date;
   deadline?: Date;
@@ -56,6 +60,7 @@ function buildWhere(filter: TaskFilter): Prisma.TaskWhereInput {
     // Soft-deleted cards stay in the table for Ctrl+Z but are invisible here.
     deletedAt: null,
     assigneeId: filter.assigneeId,
+    projectId: filter.projectId,
     status: filter.status,
     priority: filter.priority,
     category: filter.category,
@@ -122,14 +127,21 @@ export class TaskRepository {
     });
   }
 
-  countTotal(assigneeId: string): Promise<number> {
-    return this.prisma.task.count({ where: { assigneeId, deletedAt: null } });
+  countTotal(assigneeId: string, projectId?: string): Promise<number> {
+    return this.prisma.task.count({
+      where: { assigneeId, projectId, deletedAt: null },
+    });
   }
 
-  countCompleted(assigneeId: string, since?: Date): Promise<number> {
+  countCompleted(
+    assigneeId: string,
+    since?: Date,
+    projectId?: string,
+  ): Promise<number> {
     return this.prisma.task.count({
       where: {
         assigneeId,
+        projectId,
         deletedAt: null,
         status: TaskStatus.DONE,
         completedAt: since ? { gte: since } : undefined,
@@ -142,10 +154,12 @@ export class TaskRepository {
   async countOnTimeCompleted(
     assigneeId: string,
     since?: Date,
+    projectId?: string,
   ): Promise<number> {
     const completed = await this.prisma.task.findMany({
       where: {
         assigneeId,
+        projectId,
         deletedAt: null,
         status: TaskStatus.DONE,
         completedAt: since ? { gte: since } : undefined,

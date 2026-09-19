@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { UsersService } from '../../users/users.service';
+import { ProjectAccessService } from '../../projects/services/project-access.service';
 import { HashUtil } from '../../../common/utils/hash.util';
 import { BusinessException } from '../../../common/exceptions/business.exception';
 import { ERROR_CODES } from '../../../common/constants/error-codes.constants';
@@ -15,6 +16,7 @@ export class RegisterHandler {
   constructor(
     private readonly usersService: UsersService,
     private readonly tokenService: TokenService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   async execute(dto: RegisterDto, meta: RequestMeta): Promise<IssuedTokenPair> {
@@ -32,6 +34,11 @@ export class RegisterHandler {
       email: dto.email,
       passwordHash,
     });
+
+    // Tài khoản mới có sẵn "Công việc chung" để frontend vào thẳng màn hình
+    // làm việc, không phải qua bước "tạo dự án đầu tiên". Đăng nhập bằng Google
+    // đi đường khác nên không qua đây — `GET /projects` tự lành cho nhánh đó.
+    await this.projectAccess.ensureDefaultProject(user.id);
 
     return this.tokenService.issueTokenPair(
       { id: user.id, email: user.email, role: user.role },

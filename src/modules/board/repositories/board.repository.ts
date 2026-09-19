@@ -27,8 +27,18 @@ export type UpdateListInput = {
 export class BoardRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByOwner(ownerId: string): Promise<Board | null> {
-    return this.prisma.board.findUnique({ where: { ownerId } });
+  /**
+   * Bảng của một người **trong một dự án**. Không còn hàm tra theo riêng
+   * `ownerId`: từ khi có dự án, một người có nhiều bảng và "bảng của user X"
+   * không còn là một câu hỏi trả lời được.
+   */
+  findByOwnerAndProject(
+    ownerId: string,
+    projectId: string,
+  ): Promise<Board | null> {
+    return this.prisma.board.findUnique({
+      where: { ownerId_projectId: { ownerId, projectId } },
+    });
   }
 
   findById(id: string): Promise<Board | null> {
@@ -49,6 +59,7 @@ export class BoardRepository {
    */
   async createWithDefaults(
     ownerId: string,
+    projectId: string,
     title: string,
     lists: ReadonlyArray<{
       title: string;
@@ -58,7 +69,9 @@ export class BoardRepository {
     positionGap: number,
   ): Promise<Board> {
     return this.prisma.$transaction(async (tx) => {
-      const board = await tx.board.create({ data: { ownerId, title } });
+      const board = await tx.board.create({
+        data: { ownerId, projectId, title },
+      });
 
       await tx.taskList.createMany({
         data: lists.map((list, index) => ({
@@ -84,8 +97,10 @@ export class BoardRepository {
         }
       }
 
+      // Chỉ nhận việc **của đúng dự án này**: bảng thuộc dự án, nên vơ hết việc
+      // chưa có bảng của người đó sẽ kéo việc dự án khác sang.
       const owned = await tx.task.findMany({
-        where: { assigneeId: ownerId, boardId: null },
+        where: { assigneeId: ownerId, projectId, boardId: null },
         select: { id: true, status: true },
         orderBy: { createdAt: 'asc' },
       });
@@ -106,10 +121,18 @@ export class BoardRepository {
     });
   }
 
-  /** Safety net for tasks created before the board existed (e.g. mail ingestion). */
-  async adoptOrphanTasks(ownerId: string, boardId: string): Promise<number> {
+  /**
+   * Safety net for tasks created before the board existed (e.g. mail ingestion).
+   * Scoped to the project as well as the owner — a board only ever adopts the
+   * cards of its own project.
+   */
+  async adoptOrphanTasks(
+    ownerId: string,
+    projectId: string,
+    boardId: string,
+  ): Promise<number> {
     const result = await this.prisma.task.updateMany({
-      where: { assigneeId: ownerId, boardId: null },
+      where: { assigneeId: ownerId, projectId, boardId: null },
       data: { boardId },
     });
     return result.count;
