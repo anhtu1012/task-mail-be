@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
+import { ProjectsModule } from '../projects/projects.module';
 import {
   BoardLabelsController,
   BoardsController,
@@ -25,7 +26,7 @@ import { PositionService } from './services/position.service';
 import { ActivityService } from './services/activity.service';
 
 @Module({
-  imports: [UsersModule],
+  imports: [UsersModule, ProjectsModule],
   controllers: [
     BoardsController,
     BoardLabelsController,

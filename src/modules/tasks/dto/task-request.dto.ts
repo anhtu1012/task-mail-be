@@ -22,6 +22,18 @@ export class CreateTaskDto {
   @IsString()
   title: string;
 
+  /**
+   * Dự án **của người được giao**, không phải của người tạo. Bỏ trống thì rơi
+   * vào dự án mặc định của người đó.
+   *
+   * Trên `PATCH /tasks/:id`, gửi giá trị khác là chuyển việc sang dự án mới:
+   * việc về Hộp thư đến của dự án đó và mất hết nhãn cũ (nhãn thuộc bảng).
+   */
+  @ApiPropertyOptional({ description: 'Bỏ trống = dự án mặc định' })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+
   @ApiPropertyOptional({
     description: 'Link tài liệu hoặc mô tả nhiệm vụ cần thực hiện',
   })
@@ -119,6 +131,14 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
 }
 
 export class QueryTaskDto {
+  @ApiPropertyOptional({
+    description:
+      'Chỉ trả việc thuộc dự án này. Bỏ trống = mọi dự án (tương thích ngược)',
+  })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @IsInt()
@@ -175,6 +195,13 @@ export class QueryTaskDto {
 }
 
 export class TaskStatsQueryDto {
+  @ApiPropertyOptional({
+    description: 'Bỏ trống = thống kê cả tài khoản, không tách theo dự án',
+  })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+
   @ApiPropertyOptional({
     description: 'Chỉ ADMIN/SUPER_ADMIN mới được xem thống kê của người khác',
   })

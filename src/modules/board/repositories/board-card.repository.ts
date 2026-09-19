@@ -100,6 +100,8 @@ const DESCRIPTION_TEXT = Prisma.sql`
 
 export type CreateCardInput = {
   boardId: string;
+  /** Luôn là `projectId` của bảng — hai trường này không được rời nhau. */
+  projectId: string;
   listId: string | null;
   assigneeId: string;
   creatorId: string;

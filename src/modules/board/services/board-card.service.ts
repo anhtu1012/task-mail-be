@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Task, TaskList } from '../../../generated/prisma/client';
+import type { Board, Task, TaskList } from '../../../generated/prisma/client';
 import {
   ActivityAction,
   RepeatUnit,
@@ -30,6 +30,7 @@ import {
 } from '../mappers/card.mapper';
 import { BoardRepository } from '../repositories/board.repository';
 import { BoardCardRepository } from '../repositories/board-card.repository';
+import { ProjectAccessService } from '../../projects/services/project-access.service';
 import { BoardAccessService } from './board-access.service';
 import { BoardService } from './board.service';
 import { PositionService } from './position.service';
@@ -46,6 +47,7 @@ export class BoardCardService {
     private readonly boardService: BoardService,
     private readonly positions: PositionService,
     private readonly activity: ActivityService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   /**
@@ -135,12 +137,21 @@ export class BoardCardService {
     listId: string | null,
     dto: CreateCardDto,
   ): Promise<CardSummaryDto> {
-    const board = await this.access.ensureBoard(userId);
-
+    // Tạo trong một cột thì dự án suy từ bảng chứa cột — đó mới là nguồn đúng,
+    // nên `dto.projectId` bị bỏ qua ở nhánh này. Chỉ Hộp thư đến (listId null)
+    // mới cần nó, vì Hộp thư đến không thuộc cột nào.
     let list: TaskList | null = null;
+    let board: Board;
     if (listId) {
       const found = await this.access.requireList(userId, listId);
       list = found.list;
+      board = found.board;
+    } else {
+      const project = await this.projectAccess.resolveForNewTask(
+        userId,
+        dto.projectId,
+      );
+      board = await this.access.ensureBoard(userId, project.id);
     }
 
     if (dto.labelIds?.length) {
@@ -154,6 +165,7 @@ export class BoardCardService {
 
     const created = await this.cardRepository.create({
       boardId: board.id,
+      projectId: board.projectId,
       listId,
       assigneeId: userId,
       creatorId: userId,
@@ -453,6 +465,9 @@ export class BoardCardService {
 
     const next = await this.cardRepository.create({
       boardId: card.boardId as string,
+      // Lần lặp kế tiếp ở lại đúng dự án của việc gốc — nó là cùng một việc,
+      // chỉ khác ngày.
+      projectId: card.projectId,
       listId: card.listId,
       assigneeId: card.assigneeId,
       creatorId: card.creatorId ?? card.assigneeId,

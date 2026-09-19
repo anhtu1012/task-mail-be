@@ -4,6 +4,7 @@ import type { TaskRepository } from './repositories/task.repository';
 import type { BoardAccessService } from '../board/services/board-access.service';
 import type { BoardService } from '../board/services/board.service';
 import type { ActivityService } from '../board/services/activity.service';
+import type { ProjectAccessService } from '../projects/services/project-access.service';
 import { Role } from '../../common/enums/role.enum';
 import { TaskPriority } from '../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../common/enums/task-status.enum';
@@ -32,6 +33,7 @@ describe('TasksService', () => {
     externalRef: null,
     sourceMailAccountId: null,
     deadlineNotifiedAt: null,
+    projectId: 'project-1',
     tenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -52,12 +54,18 @@ describe('TasksService', () => {
       record: jest.fn().mockResolvedValue(undefined),
       dueChanged: jest.fn().mockReturnValue('Đổi hạn'),
     } as unknown as ActivityService;
+    const projectAccess = {
+      resolveForNewTask: jest.fn().mockResolvedValue({ id: 'project-1' }),
+      resolveForAutomation: jest.fn().mockResolvedValue({ id: 'project-1' }),
+      requireOwnProject: jest.fn().mockResolvedValue({ id: 'project-1' }),
+    } as unknown as ProjectAccessService;
     const service = new TasksService(
       taskRepository,
       eventEmitter,
       boardAccess,
       boardService,
       activityService,
+      projectAccess,
     );
     return {
       service,
@@ -65,6 +73,7 @@ describe('TasksService', () => {
       eventEmitter,
       boardAccess,
       activityService,
+      projectAccess,
     };
   }
 
@@ -132,6 +141,51 @@ describe('TasksService', () => {
 
     expect(taskRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({ assignedAt: receivedAt }),
+    );
+  });
+
+  // Mail có dòng "Giao cho: …" tạo việc cho người khác chủ hộp thư. Dự án phải
+  // lấy theo người được giao, nếu không việc nằm trong dự án của người A mà
+  // người B mới là người phải làm — và người B không thấy nó ở đâu cả.
+  it('resolves the project from the assignee for mail-created tasks', async () => {
+    const { service, taskRepository, projectAccess, boardAccess } = build();
+
+    await service.createSystemTask({
+      assigneeId: 'assignee-9',
+      title: 'Việc từ mail',
+      externalRef: 'gmail:1',
+      externalSyncStatus: 'IMPORTED_FROM_GMAIL',
+    });
+
+    expect(projectAccess.resolveForAutomation).toHaveBeenCalledWith(
+      'assignee-9',
+    );
+    expect(boardAccess.ensureBoard).toHaveBeenCalledWith(
+      'assignee-9',
+      'project-1',
+    );
+    expect(taskRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assigneeId: 'assignee-9',
+        projectId: 'project-1',
+      }),
+    );
+  });
+
+  // Cùng bất biến, nhánh HTTP: admin gán việc cho nhân viên thì dự án là của
+  // nhân viên, không phải của admin đang bấm nút.
+  it('resolves the project from the assignee, not the caller, on POST /tasks', async () => {
+    const { service, projectAccess } = build();
+    const admin = { sub: 'admin-1', email: 'a@b.com', role: Role.ADMIN };
+
+    await service.create(admin, {
+      title: 'Việc giao xuống',
+      assigneeId: 'staff-2',
+    });
+
+    expect(projectAccess.resolveForNewTask).toHaveBeenCalledWith(
+      'staff-2',
+      undefined,
     );
   });
 });

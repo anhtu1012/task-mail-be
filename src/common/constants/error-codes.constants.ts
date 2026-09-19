@@ -25,4 +25,14 @@ export const ERROR_CODES = {
 
   /** Body sai ràng buộc trên controller gắn `Validation422Filter`. */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
+
+  // Dự án. Giống bảng: dự án của người khác báo "không tìm thấy" chứ không
+  // "không có quyền", để API không xác nhận id đó có tồn tại.
+  PROJECT_NOT_FOUND: 'PROJECT_NOT_FOUND',
+  PROJECT_CODE_TAKEN: 'PROJECT_CODE_TAKEN',
+  PROJECT_NAME_TAKEN: 'PROJECT_NAME_TAKEN',
+  PROJECT_LIMIT_REACHED: 'PROJECT_LIMIT_REACHED',
+  PROJECT_LAST_ONE: 'PROJECT_LAST_ONE',
+  PROJECT_NOT_EMPTY: 'PROJECT_NOT_EMPTY',
+  PROJECT_ARCHIVED: 'PROJECT_ARCHIVED',
 } as const;

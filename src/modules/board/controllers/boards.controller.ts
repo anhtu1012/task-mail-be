@@ -26,6 +26,7 @@ import {
   CreateLabelDto,
   CreateListDto,
   ListCardsQueryDto,
+  ProjectScopeQueryDto,
   SearchQueryDto,
   TimezoneQueryDto,
   UpdateBoardDto,
@@ -120,17 +121,21 @@ export class BoardsController {
   @HttpCode(HttpStatus.OK)
   rebalanceInbox(
     @CurrentUser() user: RequestWithUser['user'],
+    @Query() query: ProjectScopeQueryDto,
   ): Promise<PositionDto[]> {
-    return this.listService.rebalanceInbox(user.sub);
+    return this.listService.rebalanceInbox(user.sub, query.projectId);
   }
 
   @Get(`me/${API_ROUTES.BOARDS.LABELS}`)
-  @ApiOperation({ summary: 'Danh sách nhãn của bảng' })
+  @ApiOperation({
+    summary: 'Danh sách nhãn của bảng (nhãn thuộc bảng nên phân theo dự án)',
+  })
   @ApiResponse({ status: HttpStatus.OK, type: [BoardLabelDto] })
   listLabels(
     @CurrentUser() user: RequestWithUser['user'],
+    @Query() query: ProjectScopeQueryDto,
   ): Promise<BoardLabelDto[]> {
-    return this.boardService.listLabels(user.sub);
+    return this.boardService.listLabels(user.sub, query.projectId);
   }
 
   @Patch(':id')

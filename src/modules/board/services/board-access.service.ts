@@ -28,9 +28,20 @@ export class BoardAccessService {
     private readonly usersService: UsersService,
   ) {}
 
-  /** The caller's board, seeded with default lists on first access. */
-  async ensureBoard(userId: string): Promise<Board> {
-    const existing = await this.boardRepository.findByOwner(userId);
+  /**
+   * The caller's board **for one project**, seeded with default lists on first
+   * access.
+   *
+   * `projectId` is not optional and deliberately has no default: a board now
+   * belongs to a project, so "user X's board" is no longer a question with one
+   * answer. Callers that only hold a card id must go through
+   * {@link requireCard}, which reads the board off the card itself.
+   */
+  async ensureBoard(userId: string, projectId: string): Promise<Board> {
+    const existing = await this.boardRepository.findByOwnerAndProject(
+      userId,
+      projectId,
+    );
     if (existing) {
       return existing;
     }
@@ -38,15 +49,19 @@ export class BoardAccessService {
     try {
       const board = await this.boardRepository.createWithDefaults(
         userId,
+        projectId,
         DEFAULT_BOARD_TITLE,
         DEFAULT_LISTS,
         POSITION_GAP,
       );
       return board;
     } catch {
-      // Two parallel first requests race on `ownerId @unique`; the loser just
-      // reads the board the winner created.
-      const board = await this.boardRepository.findByOwner(userId);
+      // Two parallel first requests race on `@@unique([ownerId, projectId])`;
+      // the loser just reads the board the winner created.
+      const board = await this.boardRepository.findByOwnerAndProject(
+        userId,
+        projectId,
+      );
       if (!board) {
         throw new NotFoundException(
           'Không tìm thấy bảng',
@@ -85,9 +100,19 @@ export class BoardAccessService {
   }
 
   /**
-   * A card the caller owns. Tasks created before the board existed (mail
-   * ingestion, the legacy POST /tasks) carry no `boardId`; those are adopted
-   * into the owner's board on first touch instead of 404-ing.
+   * A card the caller owns, together with the board it sits on.
+   *
+   * The board is resolved **from the card**, not from the caller. Before
+   * projects existed a user had exactly one board, so this method could fetch
+   * that board and compare ids. Now a user has one board per project, and that
+   * comparison would 404 every card outside whichever project happened to be
+   * picked — taking `move`, `snooze`, `complete`, checklists, notes and
+   * attachments down with it. The card's own `projectId` is the only thing that
+   * says which board it belongs to.
+   *
+   * Tasks created before the board existed (mail ingestion, the legacy
+   * POST /tasks) carry no `boardId`; those are adopted into the board of their
+   * own project on first touch instead of 404-ing.
    */
   async requireCard(
     userId: string,
@@ -105,19 +130,17 @@ export class BoardAccessService {
       );
     }
 
-    const board = await this.ensureBoard(userId);
     if (card.boardId === null) {
+      const board = await this.ensureBoard(userId, card.projectId);
       const adopted = await this.cardRepository.update(card.id, {
         board: { connect: { id: board.id } },
       });
       return { board, card: adopted };
     }
-    if (card.boardId !== board.id) {
-      throw new NotFoundException(
-        'Không tìm thấy việc',
-        ERROR_CODES.CARD_NOT_FOUND,
-      );
-    }
+
+    // Ownership is still checked, just from the other end: the board the card
+    // points at has to be one of the caller's.
+    const board = await this.requireOwnBoard(userId, card.boardId);
     return { board, card };
   }
 

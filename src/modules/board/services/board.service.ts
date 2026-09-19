@@ -28,6 +28,7 @@ import {
 } from '../mappers/card.mapper';
 import { BoardRepository } from '../repositories/board.repository';
 import { BoardCardRepository } from '../repositories/board-card.repository';
+import { ProjectAccessService } from '../../projects/services/project-access.service';
 import { BoardAccessService } from './board-access.service';
 
 @Injectable()
@@ -36,6 +37,7 @@ export class BoardService {
     private readonly boardRepository: BoardRepository,
     private readonly cardRepository: BoardCardRepository,
     private readonly access: BoardAccessService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   /**
@@ -48,10 +50,14 @@ export class BoardService {
     userId: string,
     query: BoardFullQueryDto,
   ): Promise<BoardFullResponseDto> {
-    const board = await this.access.ensureBoard(userId);
+    const project = await this.projectAccess.resolveForRead(
+      userId,
+      query.projectId,
+    );
+    const board = await this.access.ensureBoard(userId, project.id);
     // Tasks ingested from mail before the board existed live with boardId null;
     // adopting them here is what puts them in the Inbox.
-    await this.boardRepository.adoptOrphanTasks(userId, board.id);
+    await this.boardRepository.adoptOrphanTasks(userId, project.id, board.id);
 
     const cardsPerList = Math.min(
       query.cardsPerList ?? DEFAULT_CARDS_PER_LIST,
@@ -81,7 +87,11 @@ export class BoardService {
     userId: string,
     query: TimezoneQueryDto,
   ): Promise<TodayMetricsDto> {
-    const board = await this.access.ensureBoard(userId);
+    const project = await this.projectAccess.resolveForRead(
+      userId,
+      query.projectId,
+    );
+    const board = await this.access.ensureBoard(userId, project.id);
     const timeZone = await this.access.resolveTimezone(userId, query.tz);
     return this.computeToday(board.id, timeZone);
   }
@@ -122,8 +132,13 @@ export class BoardService {
 
   // --- labels ---------------------------------------------------------------
 
-  async listLabels(userId: string): Promise<BoardLabelDto[]> {
-    const board = await this.access.ensureBoard(userId);
+  /** Nhãn thuộc bảng, mà bảng thuộc dự án — nên nhãn tự phân vùng theo dự án. */
+  async listLabels(
+    userId: string,
+    projectId?: string,
+  ): Promise<BoardLabelDto[]> {
+    const project = await this.projectAccess.resolveForRead(userId, projectId);
+    const board = await this.access.ensureBoard(userId, project.id);
     const labels = await this.boardRepository.findLabels(board.id);
     return labels.map(toLabelDto);
   }

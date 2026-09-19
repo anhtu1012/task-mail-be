@@ -9,6 +9,11 @@ export const API_ROUTES = {
     GOOGLE: 'google',
     GOOGLE_CALLBACK: 'google/callback',
   },
+  PROJECTS: {
+    ROOT: 'projects',
+    DEFAULT: 'default',
+    ARCHIVE: 'archive',
+  },
   PREFERENCES: {
     ROOT: 'me/preferences',
     THEME: 'theme',

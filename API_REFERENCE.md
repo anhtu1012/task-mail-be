@@ -286,6 +286,71 @@ Sau khi user connect Gmail (mục 5), backend tự động:
   ```
 - `DELETE /zalo-accounts/me` — Bearer required → `204` (idempotent, gọi khi chưa link cũng không lỗi)
 
+## 6a. Module `projects` (`/projects`) — không gian làm việc cá nhân
+
+Tất cả yêu cầu Bearer. **Không có thành viên, không phân quyền**: mỗi dự án
+thuộc đúng một người, dự án của người khác trả `404 PROJECT_NOT_FOUND` (không
+phải `403`).
+
+`projectId` là **lớp phân vùng dữ liệu**, không phải bộ lọc tuỳ chọn: một việc
+thuộc đúng một dự án và không nhìn thấy được từ dự án khác.
+
+- `GET /projects?includeArchived=false` → `200`:
+  ```ts
+  { items: ProjectDto[]; total: number }
+  // ProjectDto = { id, code, name, description|null, color, icon,
+  //                isDefault, archived, stats, createdAt, updatedAt }
+  // stats      = { totalTasks, openTasks, overdueTasks, lastActivityAt|null }
+  ```
+  Sắp xếp: dự án mặc định lên đầu, còn lại theo `name` **collation tiếng Việt**
+  (sắp ở tầng ứng dụng bằng `Intl.Collator('vi')` — Postgres của Supabase chạy
+  `en_US.utf8`, xếp "Đà Nẵng" sau "Zulu").
+- `GET /projects/:id` → `200` một `ProjectDto`.
+- `POST /projects` — chỉ `name` bắt buộc. Bỏ trống `code` thì backend sinh từ
+  `name` (bỏ dấu, chữ cái đầu mỗi từ, HOA, ≤4 ký tự; trùng thì thêm số). Gửi
+  `code` chữ thường cũng nhận — backend tự hoa. Dự án **đầu tiên** của một
+  người luôn là mặc định, bất kể body gửi gì → `201`.
+- `PATCH /projects/:id` — tập con của `POST` cộng `archived`. `description: ""`
+  = xoá mô tả (lưu `null`). **Không** nhận `isDefault` (xem endpoint riêng).
+- `PUT /projects/:id/default` — body rỗng. Gỡ cờ ở các dự án khác trong cùng
+  transaction.
+- `PUT /projects/:id/archive` — body `{ archived: boolean }`. Lưu trữ **không
+  đụng vào việc**, chỉ ẩn dự án khỏi bộ chọn; nếu dự án đó đang là mặc định thì
+  cờ tự chuyển sang dự án hoạt động cũ nhất.
+- `DELETE /projects/:id` → `204`. Chỉ xoá được khi dự án **không còn việc nào**
+  (kể cả đã xoá mềm) và không phải dự án hoạt động cuối cùng. Bảng/cột/nhãn đi
+  theo bằng cascade.
+
+Ràng buộc: `code` `^[A-Z0-9]{2,8}$`; `name` 1–80 ký tự sau trim, unique trong
+phạm vi một người; `description` ≤280; `color` `^#[0-9a-fA-F]{6}$`; `icon` một
+trong `folder, briefcase, home, rocket, target, book, heart, users`. Trần **30
+dự án hoạt động** mỗi người (dự án lưu trữ không tính).
+
+Mã lỗi: `PROJECT_NOT_FOUND` (404), `PROJECT_CODE_TAKEN`, `PROJECT_NAME_TAKEN`,
+`PROJECT_LIMIT_REACHED`, `PROJECT_LAST_ONE`, `PROJECT_NOT_EMPTY`,
+`PROJECT_ARCHIVED` (409).
+
+**Tài khoản mới tự có một dự án "Công việc chung"** (`RegisterHandler`).
+Đăng nhập bằng Google đi đường khác nên `GET /projects` cũng tự tạo nếu thiếu.
+
+### 6a.1 Ảnh hưởng tới `/tasks` và `/boards`
+
+- `GET /tasks?projectId=` và `GET /tasks/stats?projectId=` — thiếu `projectId`
+  ở `/tasks` = trả việc của **mọi** dự án (tương thích ngược, có ghi log
+  cảnh báo); ở `/stats` = thống kê cả tài khoản.
+- `POST /tasks` nhận `projectId`; bỏ trống thì rơi vào dự án mặc định. Dự án là
+  của **người được giao** (`assigneeId`), không phải của người tạo.
+- `PATCH /tasks/:id` đổi `projectId` = **chuyển việc sang dự án khác**: việc về
+  Hộp thư đến của dự án mới (`listId = null`) và **mất hết nhãn cũ** (nhãn
+  thuộc bảng, bảng thuộc dự án).
+- `/boards/me/full`, `/agenda`, `/search`, `/today`, `/labels`,
+  `/boards/me/inbox/cards`, `/boards/me/inbox/rebalance` nhận `?projectId=`;
+  bỏ trống = dự án mặc định. `/full` tự tạo bảng cho dự án chưa có.
+- `POST /tasks/inbox/cards` nhận `projectId` trong body.
+  `POST /lists/:id/cards` **không** đổi — dự án suy từ bảng chứa cột.
+- Các endpoint thao tác theo id (`/move`, `/snooze`, `/complete`, checklist,
+  ghi chú, đính kèm) **không** cần `projectId`: bảng được suy từ chính thẻ đó.
+
 ## 6b. Module `preferences` (`/me/preferences`) — giao diện người dùng tự chỉnh
 
 Tất cả yêu cầu Bearer. Trần riêng 60 req/phút (mức chung 20/phút quá sát vì lần
