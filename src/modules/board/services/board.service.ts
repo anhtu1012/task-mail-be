@@ -28,7 +28,6 @@ import {
 } from '../mappers/card.mapper';
 import { BoardRepository } from '../repositories/board.repository';
 import { BoardCardRepository } from '../repositories/board-card.repository';
-import { ProjectAccessService } from '../../projects/services/project-access.service';
 import { BoardAccessService } from './board-access.service';
 
 @Injectable()
@@ -37,7 +36,6 @@ export class BoardService {
     private readonly boardRepository: BoardRepository,
     private readonly cardRepository: BoardCardRepository,
     private readonly access: BoardAccessService,
-    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   /**
@@ -50,20 +48,28 @@ export class BoardService {
     userId: string,
     query: BoardFullQueryDto,
   ): Promise<BoardFullResponseDto> {
-    const project = await this.projectAccess.resolveForRead(
-      userId,
-      query.projectId,
-    );
-    const board = await this.access.ensureBoard(userId, project.id);
-    // Tasks ingested from mail before the board existed live with boardId null;
-    // adopting them here is what puts them in the Inbox.
-    await this.boardRepository.adoptOrphanTasks(userId, project.id, board.id);
+    // Múi giờ chỉ cần `userId` nên không phải chờ bảng — chạy song song để bớt
+    // một vòng mạng. Sau lần đầu nó còn được phục vụ từ cache trong bộ nhớ.
+    const [{ board, projectId, created }, timeZone] = await Promise.all([
+      this.access.resolveBoardForRead(userId, query.projectId),
+      this.access.resolveTimezone(userId, query.tz),
+    ]);
+
+    // Task nhận từ mail trước khi bảng tồn tại có `boardId` null; gom chúng vào
+    // đây là thứ đưa chúng vào Hộp thư đến.
+    //
+    // **Chỉ chạy khi bảng vừa được tạo.** Sau thời điểm đó không thể sinh thêm
+    // task mồ côi nữa — mọi đường tạo việc đều gán `boardId` — nên chạy mỗi lần
+    // tải bảng chỉ là trả một vòng mạng cho một `UPDATE` cập nhật 0 dòng. Thẻ
+    // sót lại từ dữ liệu cũ vẫn được `requireCard` nhận khi chạm tới.
+    if (created) {
+      await this.boardRepository.adoptOrphanTasks(userId, projectId, board.id);
+    }
 
     const cardsPerList = Math.min(
       query.cardsPerList ?? DEFAULT_CARDS_PER_LIST,
       MAX_CARDS_PER_LIST,
     );
-    const timeZone = await this.access.resolveTimezone(userId, query.tz);
 
     const [lists, labels, cards, cardCounts, today] = await Promise.all([
       this.boardRepository.findLists(board.id),
@@ -87,12 +93,10 @@ export class BoardService {
     userId: string,
     query: TimezoneQueryDto,
   ): Promise<TodayMetricsDto> {
-    const project = await this.projectAccess.resolveForRead(
-      userId,
-      query.projectId,
-    );
-    const board = await this.access.ensureBoard(userId, project.id);
-    const timeZone = await this.access.resolveTimezone(userId, query.tz);
+    const [{ board }, timeZone] = await Promise.all([
+      this.access.resolveBoardForRead(userId, query.projectId),
+      this.access.resolveTimezone(userId, query.tz),
+    ]);
     return this.computeToday(board.id, timeZone);
   }
 
@@ -137,8 +141,7 @@ export class BoardService {
     userId: string,
     projectId?: string,
   ): Promise<BoardLabelDto[]> {
-    const project = await this.projectAccess.resolveForRead(userId, projectId);
-    const board = await this.access.ensureBoard(userId, project.id);
+    const { board } = await this.access.resolveBoardForRead(userId, projectId);
     const labels = await this.boardRepository.findLabels(board.id);
     return labels.map(toLabelDto);
   }

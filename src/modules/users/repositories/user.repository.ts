@@ -23,6 +23,15 @@ export class UserRepository {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  /** Chỉ một cột — đọc múi giờ không cần kéo về cả hàng `users`. */
+  async findTimezone(id: string): Promise<string | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { id },
+      select: { timezone: true },
+    });
+    return row?.timezone ?? null;
+  }
+
   findByGoogleId(googleId: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { googleId } });
   }

@@ -10,6 +10,7 @@ import { NotFoundException } from '../../../common/exceptions/not-found.exceptio
 import { BoardRepository } from '../repositories/board.repository';
 import { BoardCardRepository } from '../repositories/board-card.repository';
 import { UsersService } from '../../users/users.service';
+import { ProjectAccessService } from '../../projects/services/project-access.service';
 
 /**
  * Ownership and lookup helpers shared by every board service.
@@ -26,6 +27,7 @@ export class BoardAccessService {
     private readonly boardRepository: BoardRepository,
     private readonly cardRepository: BoardCardRepository,
     private readonly usersService: UsersService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   /**
@@ -38,14 +40,31 @@ export class BoardAccessService {
    * {@link requireCard}, which reads the board off the card itself.
    */
   async ensureBoard(userId: string, projectId: string): Promise<Board> {
+    return (await this.ensureBoardTracked(userId, projectId)).board;
+  }
+
+  /**
+   * Như {@link ensureBoard} nhưng nói thêm bảng có **vừa được tạo** hay không.
+   *
+   * Chỉ `getFull` cần biết: việc gom các task mồ côi vào bảng là một lệnh GHI,
+   * và nó chỉ có thể tìm thấy gì đó ngay sau khi bảng ra đời. Chạy nó trên mọi
+   * lần tải bảng là trả giá một vòng mạng cho một `UPDATE` cập nhật 0 dòng.
+   */
+  async ensureBoardTracked(
+    userId: string,
+    projectId: string,
+  ): Promise<{ board: Board; created: boolean }> {
     const existing = await this.boardRepository.findByOwnerAndProject(
       userId,
       projectId,
     );
     if (existing) {
-      return existing;
+      return { board: existing, created: false };
     }
+    return { board: await this.createBoard(userId, projectId), created: true };
+  }
 
+  private async createBoard(userId: string, projectId: string): Promise<Board> {
     try {
       const board = await this.boardRepository.createWithDefaults(
         userId,
@@ -70,6 +89,47 @@ export class BoardAccessService {
       }
       return board;
     }
+  }
+
+  /**
+   * Bảng + dự án cho một endpoint bảng, tốn **một** vòng mạng ở trường hợp
+   * thường gặp.
+   *
+   * Cách viết thẳng là `projectAccess.resolveForRead()` rồi `ensureBoard()` —
+   * hai truy vấn tuần tự, mà frontend gọi tổ hợp này ở mọi màn hình.
+   *
+   * Nhưng khi đã có `projectId`, việc tra bảng **tự nó đã là phép kiểm quyền**:
+   * tìm thấy một dòng `boards` khớp cả `ownerId` lẫn `projectId` nghĩa là dự án
+   * đó tồn tại và thuộc người gọi. Không cần đọc hàng `projects` nữa, và
+   * `board.projectId` cho lại chính id ấy.
+   *
+   * (Cố tình **không** dùng `include: { project: true }`: Prisma không JOIN cho
+   * quan hệ như vậy mà bắn thêm một truy vấn riêng, tức là không tiết kiệm được
+   * vòng mạng nào.)
+   *
+   * Hai đường chậm còn lại giữ nguyên ngữ nghĩa cũ: thiếu `projectId` thì phải
+   * tra dự án mặc định trước, và bảng chưa có thì phải kiểm dự án rồi mới dựng.
+   */
+  async resolveBoardForRead(
+    userId: string,
+    projectId?: string,
+  ): Promise<{ board: Board; projectId: string; created: boolean }> {
+    if (projectId) {
+      const fast = await this.boardRepository.findByOwnerAndProject(
+        userId,
+        projectId,
+      );
+      if (fast) {
+        return { board: fast, projectId: fast.projectId, created: false };
+      }
+    }
+
+    const project = await this.projectAccess.resolveForRead(userId, projectId);
+    const { board, created } = await this.ensureBoardTracked(
+      userId,
+      project.id,
+    );
+    return { board, projectId: project.id, created };
   }
 
   /** Board addressed by id — only ever the caller's own. */

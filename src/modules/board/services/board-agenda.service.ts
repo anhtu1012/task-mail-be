@@ -10,7 +10,6 @@ import {
 } from '../dto/board-response.dto';
 import { toCardSummary } from '../mappers/card.mapper';
 import { BoardCardRepository } from '../repositories/board-card.repository';
-import { ProjectAccessService } from '../../projects/services/project-access.service';
 import { BoardAccessService } from './board-access.service';
 import { BoardService } from './board.service';
 
@@ -22,7 +21,6 @@ export class BoardAgendaService {
     private readonly cardRepository: BoardCardRepository,
     private readonly access: BoardAccessService,
     private readonly boardService: BoardService,
-    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   /**
@@ -37,12 +35,10 @@ export class BoardAgendaService {
     userId: string,
     query: AgendaQueryDto,
   ): Promise<AgendaResponseDto> {
-    const project = await this.projectAccess.resolveForRead(
-      userId,
-      query.projectId,
-    );
-    const board = await this.access.ensureBoard(userId, project.id);
-    const timeZone = await this.access.resolveTimezone(userId, query.tz);
+    const [{ board }, timeZone] = await Promise.all([
+      this.access.resolveBoardForRead(userId, query.projectId),
+      this.access.resolveTimezone(userId, query.tz),
+    ]);
 
     if (query.tz && !TimezoneUtil.isValid(query.tz)) {
       throw new BusinessException(
@@ -91,11 +87,10 @@ export class BoardAgendaService {
   ): Promise<SearchResponseDto> {
     // Tìm kiếm tuyệt đối không được trả việc của dự án khác: `board.id` đã phân
     // vùng sẵn, nên chỉ cần lấy đúng bảng của dự án đang mở.
-    const project = await this.projectAccess.resolveForRead(
+    const { board } = await this.access.resolveBoardForRead(
       userId,
       query.projectId,
     );
-    const board = await this.access.ensureBoard(userId, project.id);
     const term = StringUtil.removeDiacritics(query.q).trim();
     if (!term) return { items: [], total: 0 };
 

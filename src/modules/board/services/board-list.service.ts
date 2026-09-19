@@ -18,7 +18,6 @@ import {
 import { toCardSummary, toListDto } from '../mappers/card.mapper';
 import { BoardRepository } from '../repositories/board.repository';
 import { BoardCardRepository } from '../repositories/board-card.repository';
-import { ProjectAccessService } from '../../projects/services/project-access.service';
 import { BoardAccessService } from './board-access.service';
 import { PositionService } from './position.service';
 
@@ -29,7 +28,6 @@ export class BoardListService {
     private readonly cardRepository: BoardCardRepository,
     private readonly access: BoardAccessService,
     private readonly positions: PositionService,
-    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   async create(
@@ -110,8 +108,7 @@ export class BoardListService {
     userId: string,
     projectId?: string,
   ): Promise<PositionDto[]> {
-    const project = await this.projectAccess.resolveForRead(userId, projectId);
-    const board = await this.access.ensureBoard(userId, project.id);
+    const { board } = await this.access.resolveBoardForRead(userId, projectId);
     return this.positions.rebalanceCards(board.id, null);
   }
 
@@ -133,11 +130,10 @@ export class BoardListService {
     userId: string,
     query: ListCardsQueryDto,
   ): Promise<CardPageDto> {
-    const project = await this.projectAccess.resolveForRead(
+    const { board } = await this.access.resolveBoardForRead(
       userId,
       query.projectId,
     );
-    const board = await this.access.ensureBoard(userId, project.id);
     return this.pageOf(board.id, null, query);
   }
 
