@@ -7,8 +7,24 @@ import {
   CreateUserInput,
 } from './repositories/user.repository';
 
+/**
+ * Múi giờ của một người gần như không bao giờ đổi, nhưng nó bị đọc ở **mọi**
+ * endpoint bảng — mà mỗi lần đọc là một vòng mạng tới Singapore.
+ *
+ * 5 phút đủ ngắn để một lần đổi múi giờ có hiệu lực ngay trong phiên làm việc,
+ * và đủ dài để xoá hẳn truy vấn này khỏi đường nóng. Cache nằm trong bộ nhớ
+ * tiến trình: nhiều instance sẽ lệch nhau tối đa 5 phút, chấp nhận được với một
+ * giá trị chỉ dùng để cắt mốc ngày.
+ */
+const TIMEZONE_CACHE_TTL_MS = 5 * 60_000;
+
 @Injectable()
 export class UsersService {
+  private readonly timezoneCache = new Map<
+    string,
+    { value: string; expiresAt: number }
+  >();
+
   constructor(private readonly userRepository: UserRepository) {}
 
   /**
@@ -20,11 +36,26 @@ export class UsersService {
    */
   async resolveTimezone(userId: string, requested?: string): Promise<string> {
     if (requested && TimezoneUtil.isValid(requested)) return requested;
-    const user = await this.userRepository.findById(userId);
-    if (user?.timezone && TimezoneUtil.isValid(user.timezone)) {
-      return user.timezone;
-    }
-    return DEFAULT_TIMEZONE;
+
+    const cached = this.timezoneCache.get(userId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    // `select` chỉ lấy cột cần: dòng `users` đầy đủ kéo theo cả `password_hash`
+    // và token Google cho một giá trị dài 20 ký tự.
+    const timezone = await this.userRepository.findTimezone(userId);
+    const resolved =
+      timezone && TimezoneUtil.isValid(timezone) ? timezone : DEFAULT_TIMEZONE;
+
+    this.timezoneCache.set(userId, {
+      value: resolved,
+      expiresAt: Date.now() + TIMEZONE_CACHE_TTL_MS,
+    });
+    return resolved;
+  }
+
+  /** Gọi khi múi giờ của người dùng thay đổi, để lần đọc sau không lấy bản cũ. */
+  invalidateTimezone(userId: string): void {
+    this.timezoneCache.delete(userId);
   }
 
   findByEmail(email: string): Promise<User | null> {

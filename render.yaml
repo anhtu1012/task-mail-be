@@ -4,6 +4,11 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    # Cùng vùng với Supabase (`aws-0-ap-southeast-1`). Bỏ trống thì Render mặc
+    # định Oregon, và mỗi vòng mạng tới DB tốn ~180 ms thay vì ~5–20 ms — nhân
+    # lên số truy vấn tuần tự của một endpoint thì đó là phần lớn thời gian phản
+    # hồi. Render không đổi vùng tại chỗ: phải tạo lại service.
+    region: singapore
     autoDeploy: true
     healthCheckPath: /health
     envVars:
