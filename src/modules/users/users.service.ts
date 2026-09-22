@@ -6,6 +6,7 @@ import {
   UserRepository,
   CreateUserInput,
 } from './repositories/user.repository';
+import { UserSummaryDto } from './dto/user-response.dto';
 
 /**
  * Múi giờ của một người gần như không bao giờ đổi, nhưng nó bị đọc ở **mọi**
@@ -26,6 +27,11 @@ export class UsersService {
   >();
 
   constructor(private readonly userRepository: UserRepository) {}
+
+  /** Người có thể được giao việc — xem `UsersController.findAssignable` */
+  findAssignable(): Promise<UserSummaryDto[]> {
+    return this.userRepository.findAssignable();
+  }
 
   /**
    * The zone every wall-clock time for this user must be read and written in.

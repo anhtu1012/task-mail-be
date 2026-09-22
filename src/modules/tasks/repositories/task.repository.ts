@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import type { Task } from '../../../generated/prisma/client';
+import type { Role } from '../../../generated/prisma/enums';
 import {
   RepeatUnit,
   TaskCategory,
@@ -73,16 +74,49 @@ function buildWhere(filter: TaskFilter): Prisma.TaskWhereInput {
   };
 }
 
+/**
+ * Quan hệ luôn kèm theo khi đọc task để hiển thị.
+ *
+ * `assignee`/`creator` chỉ lấy ba cột: giao diện cần email để hiện tên người,
+ * `role` để phân biệt admin. Kéo cả hàng `users` về là mang theo `passwordHash`
+ * và `googleId` — dữ liệu không được phép rời khỏi tầng auth.
+ */
+const USER_REF = { select: { id: true, email: true, role: true } } as const;
+
+type UserRef = { id: string; email: string; role: Role };
+
+/** Task kèm đúng những quan hệ mà `TASK_INCLUDE` nạp */
+export type TaskWithRelations = Task & {
+  labels: { labelId: string }[];
+  assignee: UserRef | null;
+  creator: UserRef | null;
+};
+
+const TASK_INCLUDE = {
+  labels: { select: { labelId: true } },
+  assignee: USER_REF,
+  creator: USER_REF,
+} as const;
+
 @Injectable()
 export class TaskRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findMany(filter: TaskFilter, pagination: PaginationParams): Promise<Task[]> {
+  /**
+   * Kèm `labels` để màn Lịch / Kanban / Công việc vẽ được nhãn.
+   * Chỉ lấy `labelId` — tên và màu nhãn đã có sẵn ở `/boards/me/labels`, kéo
+   * thêm chúng vào mỗi hàng task là nhân bản cùng một dữ liệu hàng trăm lần.
+   */
+  findMany(
+    filter: TaskFilter,
+    pagination: PaginationParams,
+  ): Promise<TaskWithRelations[]> {
     return this.prisma.task.findMany({
       where: buildWhere(filter),
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
       orderBy: { createdAt: 'desc' },
+      include: TASK_INCLUDE,
     });
   }
 
@@ -90,8 +124,11 @@ export class TaskRepository {
     return this.prisma.task.count({ where: buildWhere(filter) });
   }
 
-  findById(id: string): Promise<Task | null> {
-    return this.prisma.task.findFirst({ where: { id, deletedAt: null } });
+  findById(id: string): Promise<TaskWithRelations | null> {
+    return this.prisma.task.findFirst({
+      where: { id, deletedAt: null },
+      include: TASK_INCLUDE,
+    });
   }
 
   findByExternalRef(externalRef: string): Promise<Task | null> {

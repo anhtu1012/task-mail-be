@@ -23,6 +23,21 @@ export class UserRepository {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  /**
+   * Danh sách người có thể được giao việc.
+   *
+   * Chỉ trả người đang ACTIVE: giao việc cho tài khoản đã khoá thì việc rơi
+   * vào chỗ không ai mở được. Sắp theo email vì đó là thứ duy nhất người dùng
+   * đọc được — bảng `users` không có cột tên.
+   */
+  findAssignable(): Promise<Pick<User, 'id' | 'email' | 'role'>[]> {
+    return this.prisma.user.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, email: true, role: true },
+      orderBy: { email: 'asc' },
+    });
+  }
+
   /** Chỉ một cột — đọc múi giờ không cần kéo về cả hàng `users`. */
   async findTimezone(id: string): Promise<string | null> {
     const row = await this.prisma.user.findUnique({

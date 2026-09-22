@@ -1,6 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Task } from '../../generated/prisma/client';
+
+/**
+ * Task kèm nhãn — `labels` chỉ có ở những truy vấn khai báo `include`.
+ * Để tuỳ chọn thay vì bắt buộc: nhánh tạo task từ email và vài chỗ nội bộ
+ * không cần nhãn, ép chúng nạp thêm một quan hệ chỉ để thoả kiểu là lãng phí.
+ */
+type UserRef = { id: string; email: string; role: Role };
+
+type TaskWithLabels = Task & {
+  labels?: { labelId: string }[];
+  /** Chỉ được nạp ở truy vấn có `include` — xem TaskRepository */
+  assignee?: UserRef | null;
+  creator?: UserRef | null;
+};
 import { TaskStatus } from '../../common/enums/task-status.enum';
 import { TaskPriority } from '../../common/enums/task-priority.enum';
 import { TaskCategory } from '../../common/enums/task-category.enum';
@@ -17,6 +31,7 @@ import { BoardService } from '../board/services/board.service';
 import { ActivityService } from '../board/services/activity.service';
 import { ProjectAccessService } from '../projects/services/project-access.service';
 import { repeatColumns } from '../../common/utils/recurrence.util';
+import { toRepeatDto } from '../board/mappers/card.mapper';
 import { TaskRepository } from './repositories/task.repository';
 import {
   CreateTaskDto,
@@ -425,9 +440,10 @@ export class TasksService {
     return DeadlineUtil.compute(task);
   }
 
-  private toResponse(task: Task): TaskResponseDto {
+  private toResponse(task: TaskWithLabels): TaskResponseDto {
     return {
       id: task.id,
+      projectId: task.projectId,
       code: `TSK-${String(task.seq).padStart(6, '0')}`,
       title: task.title,
       description: task.description,
@@ -438,12 +454,27 @@ export class TasksService {
       status: task.status,
       deadlineStatus: this.computeDeadlineStatus(task),
       assigneeId: task.assigneeId,
+      assignee: task.assignee ?? null,
       creatorId: task.creatorId,
+      creator: task.creator ?? null,
       assignedAt: task.assignedAt,
       deadline: task.deadline,
       completedAt: task.completedAt,
       attachments: task.attachments,
       sourceMailAccountId: task.sourceMailAccountId,
+      repeat: toRepeatDto({
+        unit: task.repeatUnit,
+        interval: task.repeatInterval,
+        weekdays: task.repeatWeekdays,
+        dayOfMonth: task.repeatDayOfMonth,
+        until: task.repeatUntil,
+        remaining: task.repeatRemaining,
+      }),
+      estimateMinutes: task.estimateMinutes,
+      // `labels` chỉ được nạp ở những truy vấn có `include` (danh sách và chi
+      // tiết). Chỗ khác không nạp thì trả mảng rỗng chứ không phải `undefined`
+      // — frontend đỡ phải kiểm tra hai kiểu vắng mặt khác nhau.
+      labelIds: task.labels?.map((l) => l.labelId) ?? [],
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     };
