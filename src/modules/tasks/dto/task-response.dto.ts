@@ -4,6 +4,7 @@ import { TaskStatus } from '../../../common/enums/task-status.enum';
 import { TaskCategory } from '../../../common/enums/task-category.enum';
 import { CardRepeatDto } from '../../board/dto/board-response.dto';
 import { UserSummaryDto } from '../../users/dto/user-response.dto';
+import { ItemKind } from '../../../common/enums/item-kind.enum';
 
 export type DeadlineStatus = 'IN_PROGRESS' | 'ON_TIME' | 'LATE';
 
@@ -63,8 +64,24 @@ export class TaskResponseDto {
   @ApiPropertyOptional()
   assignedAt?: Date | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Hạn chót — chỉ có nghĩa với kind=TASK' })
   deadline?: Date | null;
+
+  /**
+   * Loại bản ghi. TASK dùng `deadline`; EVENT dùng `startAt`..`endAt`.
+   * Xem ghi chú ở model Task của Prisma.
+   */
+  @ApiProperty({ enum: ItemKind })
+  kind: ItemKind;
+
+  @ApiPropertyOptional({ description: 'Chỉ có với kind=EVENT' })
+  startAt?: Date | null;
+
+  @ApiPropertyOptional({ description: 'Chỉ có với kind=EVENT' })
+  endAt?: Date | null;
+
+  @ApiProperty({ description: 'Sự kiện cả ngày' })
+  allDay: boolean;
 
   @ApiPropertyOptional()
   completedAt?: Date | null;

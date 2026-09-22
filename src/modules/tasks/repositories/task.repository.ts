@@ -3,6 +3,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import type { Task } from '../../../generated/prisma/client';
 import type { Role } from '../../../generated/prisma/enums';
+import { ItemKind } from '../../../common/enums/item-kind.enum';
 import {
   RepeatUnit,
   TaskCategory,
@@ -12,6 +13,8 @@ import {
 import { PaginationParams } from '../../../common/types/pagination.type';
 
 export type TaskFilter = {
+  /** Bỏ trống = không lọc theo loại (service mặc định truyền TASK) */
+  kind?: ItemKind;
   assigneeId?: string;
   /** Lớp phân vùng. Bỏ trống = mọi dự án (xem `TasksService.list`). */
   projectId?: string;
@@ -41,7 +44,8 @@ export type CreateTaskInput = {
   externalRef?: string;
   externalSyncStatus?: string;
   sourceMailAccountId?: string;
-  boardId?: string;
+  /** `null` = KHÔNG thuộc bảng nào — sự kiện lịch dùng giá trị này */
+  boardId?: string | null;
   cover?: string | null;
   estimateMinutes?: number | null;
   repeatUnit?: RepeatUnit | null;
@@ -57,9 +61,10 @@ export type UpdateTaskInput = Partial<
 };
 
 function buildWhere(filter: TaskFilter): Prisma.TaskWhereInput {
-  return {
+  const where: Prisma.TaskWhereInput = {
     // Soft-deleted cards stay in the table for Ctrl+Z but are invisible here.
     deletedAt: null,
+    kind: filter.kind,
     assigneeId: filter.assigneeId,
     projectId: filter.projectId,
     status: filter.status,
@@ -67,11 +72,35 @@ function buildWhere(filter: TaskFilter): Prisma.TaskWhereInput {
     category: filter.category,
     taskTypeId: filter.taskTypeId,
     sourceMailAccountId: filter.sourceMailAccountId,
-    deadline:
-      filter.deadlineFrom || filter.deadlineTo
-        ? { gte: filter.deadlineFrom, lte: filter.deadlineTo }
-        : undefined,
   };
+
+  /*
+   * Lọc theo khoảng thời gian phải hỏi hai câu khác nhau cho hai loại:
+   *   - TASK  chạm khoảng khi `deadline` nằm trong đó (một mốc);
+   *   - EVENT chạm khoảng khi nó GIAO với khoảng — bắt đầu trước khi khoảng
+   *     kết thúc và kết thúc sau khi khoảng bắt đầu.
+   *
+   * Hỏi cùng một câu cho cả hai sẽ đánh rơi đúng loại sự kiện dễ thấy nhất:
+   * cái kéo dài từ tháng trước sang tháng đang xem.
+   */
+  const hasRange = !!(filter.deadlineFrom || filter.deadlineTo);
+  if (!hasRange) return where;
+
+  const clauses: Prisma.TaskWhereInput[] = [];
+  if (filter.kind !== ItemKind.EVENT) {
+    clauses.push({
+      kind: ItemKind.TASK,
+      deadline: { gte: filter.deadlineFrom, lte: filter.deadlineTo },
+    });
+  }
+  if (filter.kind !== ItemKind.TASK) {
+    clauses.push({
+      kind: ItemKind.EVENT,
+      startAt: { lte: filter.deadlineTo },
+      endAt: { gte: filter.deadlineFrom },
+    });
+  }
+  return { ...where, OR: clauses };
 }
 
 /**

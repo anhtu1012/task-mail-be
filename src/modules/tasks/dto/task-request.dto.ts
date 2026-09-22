@@ -2,8 +2,10 @@ import { ApiPropertyOptional, ApiProperty, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -16,11 +18,41 @@ import { CardRepeatDtoInput } from '../../board/dto/board-request.dto';
 import { TaskPriority } from '../../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../../common/enums/task-status.enum';
 import { TaskCategory } from '../../../common/enums/task-category.enum';
+import { ItemKind } from '../../../common/enums/item-kind.enum';
 
 export class CreateTaskDto {
   @ApiProperty({ example: 'Chỉnh sửa KPI tháng 07.2026' })
   @IsString()
   title: string;
+
+  /**
+   * TASK (mặc định) hay EVENT.
+   *
+   * EVENT **bắt buộc** có `startAt` + `endAt`; `deadline` gửi kèm sẽ bị bỏ qua
+   * (backend tự nhân bản từ `startAt`). TASK thì ngược lại: `startAt`/`endAt`
+   * gửi kèm bị bỏ qua.
+   */
+  @ApiPropertyOptional({ enum: ItemKind, default: ItemKind.TASK })
+  @IsOptional()
+  @IsEnum(ItemKind)
+  kind?: ItemKind;
+
+  @ApiPropertyOptional({ description: 'ISO — bắt buộc khi kind=EVENT' })
+  @IsOptional()
+  @IsDateString()
+  startAt?: string;
+
+  @ApiPropertyOptional({
+    description: 'ISO — bắt buộc khi kind=EVENT, phải >= startAt',
+  })
+  @IsOptional()
+  @IsDateString()
+  endAt?: string;
+
+  @ApiPropertyOptional({ description: 'Sự kiện cả ngày', default: false })
+  @IsOptional()
+  @IsBoolean()
+  allDay?: boolean;
 
   /**
    * Dự án **của người được giao**, không phải của người tạo. Bỏ trống thì rơi
@@ -138,6 +170,19 @@ export class QueryTaskDto {
   @IsOptional()
   @IsUUID()
   projectId?: string;
+
+  /**
+   * Lọc theo loại. **Bỏ trống = chỉ TASK**, không phải cả hai.
+   *
+   * Mặc định như vậy để mọi màn đang có (Công việc, Kanban, Tổng quan) giữ
+   * nguyên hành vi sau khi có sự kiện — thêm một khái niệm mới không được phép
+   * làm dữ liệu lạ tự chui vào những màn viết trước nó. Lịch là màn duy nhất
+   * cần cả hai, và nó gửi `kind=ALL`.
+   */
+  @ApiPropertyOptional({ enum: ['TASK', 'EVENT', 'ALL'], default: 'TASK' })
+  @IsOptional()
+  @IsIn(['TASK', 'EVENT', 'ALL'])
+  kind?: 'TASK' | 'EVENT' | 'ALL';
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
