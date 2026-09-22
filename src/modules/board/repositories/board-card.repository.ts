@@ -25,6 +25,10 @@ export type CardSummaryRow = {
   estimate_minutes: number | null;
   repeat_unit: RepeatUnit | null;
   repeat_interval: number | null;
+  repeat_weekdays: number[];
+  repeat_day_of_month: number | null;
+  repeat_until: Date | null;
+  repeat_remaining: number | null;
   cover: string | null;
   source_mail_account_id: string | null;
   external_ref: string | null;
@@ -54,7 +58,9 @@ export type TodayMetricsRow = {
 const CARD_COLUMNS = Prisma.sql`
   t.id, t.list_id, t.board_id, t.seq, t.title, t.position, t.priority,
   t.category, t.status, t.deadline, t.completed_at, t.estimate_minutes,
-  t.repeat_unit, t.repeat_interval, t.cover, t.source_mail_account_id,
+  t.repeat_unit, t.repeat_interval, t.repeat_weekdays, t.repeat_day_of_month,
+  t.repeat_until, t.repeat_remaining,
+  t.cover, t.source_mail_account_id,
   t.external_ref,
   (
     t.description IS NOT NULL AND (
@@ -116,6 +122,10 @@ export type CreateCardInput = {
   estimateMinutes?: number | null;
   repeatUnit?: RepeatUnit | null;
   repeatInterval?: number | null;
+  repeatWeekdays?: number[];
+  repeatDayOfMonth?: number | null;
+  repeatUntil?: Date | null;
+  repeatRemaining?: number | null;
   cover?: string | null;
   labelIds?: string[];
 };

@@ -156,6 +156,7 @@ export class BoardService {
       boardId,
       name: dto.name,
       color: dto.color,
+      icon: dto.icon ?? null,
       slug: this.uniqueSlug(dto.name),
     });
     return toLabelDto(label);
@@ -170,6 +171,9 @@ export class BoardService {
     const updated = await this.boardRepository.updateLabel(label.id, {
       name: dto.name,
       color: dto.color,
+      // `undefined` = không đụng tới, `null` = gỡ icon. Hai thứ khác nhau nên
+      // không được gộp bằng `?? null`.
+      icon: dto.icon,
       slug: dto.name ? this.uniqueSlug(dto.name) : undefined,
     });
     return toLabelDto(updated);

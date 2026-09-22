@@ -34,6 +34,11 @@ export class BoardLabelDto {
   @ApiProperty() boardId: string;
   @ApiProperty() name: string;
   @ApiProperty({ example: '#e63946' }) color: string;
+  @ApiPropertyOptional({
+    description: 'Tên icon trong danh sách đóng LABEL_ICONS. null = chỉ có màu',
+    example: 'tag',
+  })
+  icon: string | null;
   @ApiProperty({ description: 'Không dấu, cho quick-add "#baogia"' })
   slug: string;
 }
@@ -41,6 +46,24 @@ export class BoardLabelDto {
 export class CardRepeatDto {
   @ApiProperty({ enum: ['DAY', 'WEEK', 'MONTH'] }) unit: string;
   @ApiProperty() interval: number;
+  @ApiProperty({
+    type: [Number],
+    description:
+      '0=CN..6=T7. Chỉ dùng cho WEEK. Rỗng = giữ thứ của hạn hiện tại',
+    example: [1, 4],
+  })
+  weekdays: number[];
+  @ApiPropertyOptional({
+    description:
+      '1..31, chỉ dùng cho MONTH. Tháng ngắn hơn thì kẹp về cuối tháng',
+  })
+  dayOfMonth: number | null;
+  @ApiPropertyOptional({ description: 'Không sinh lượt nào vượt mốc này' })
+  until: Date | null;
+  @ApiPropertyOptional({
+    description: 'Số lượt còn lại SAU lượt này. null = lặp mãi',
+  })
+  remaining: number | null;
 }
 
 /** Rút gọn — đủ để vẽ thẻ trên bảng, không kèm quan hệ con. */

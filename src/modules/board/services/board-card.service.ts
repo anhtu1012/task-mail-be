@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import type { Board, Task, TaskList } from '../../../generated/prisma/client';
-import {
-  ActivityAction,
-  RepeatUnit,
-  TaskStatus,
-} from '../../../generated/prisma/enums';
+import { ActivityAction, TaskStatus } from '../../../generated/prisma/enums';
 import { POSITION_GAP } from '../../../common/constants/board.constants';
 import { ERROR_CODES } from '../../../common/constants/error-codes.constants';
 import { BusinessException } from '../../../common/exceptions/business.exception';
 import { NotFoundException } from '../../../common/exceptions/not-found.exception';
 import { RichTextUtil } from '../../../common/utils/rich-text.util';
 import { DeadlineUtil } from '../../../common/utils/deadline.util';
+import {
+  nextOccurrence,
+  repeatColumns,
+} from '../../../common/utils/recurrence.util';
 import {
   CreateCardDto,
   MoveCardDto,
@@ -27,6 +27,7 @@ import {
   formatTaskCode,
   resolveCardSource,
   toCardSummary,
+  toRepeatDto,
 } from '../mappers/card.mapper';
 import { BoardRepository } from '../repositories/board.repository';
 import { BoardCardRepository } from '../repositories/board-card.repository';
@@ -176,8 +177,7 @@ export class BoardCardService {
       priority: dto.priority,
       category: dto.category,
       estimateMinutes: dto.estimateMinutes ?? null,
-      repeatUnit: dto.repeat?.unit ?? null,
-      repeatInterval: dto.repeat?.interval ?? null,
+      ...repeatColumns(dto.repeat),
       cover: dto.cover ?? null,
       labelIds: dto.labelIds,
       ...(list?.mapsToStatus ? { status: list.mapsToStatus } : {}),
@@ -219,10 +219,14 @@ export class BoardCardService {
       deadlineStatus: DeadlineUtil.compute(card),
       completedAt: card.completedAt,
       estimateMinutes: card.estimateMinutes,
-      repeat:
-        card.repeatUnit && card.repeatInterval
-          ? { unit: card.repeatUnit, interval: card.repeatInterval }
-          : null,
+      repeat: toRepeatDto({
+        unit: card.repeatUnit,
+        interval: card.repeatInterval,
+        weekdays: card.repeatWeekdays,
+        dayOfMonth: card.repeatDayOfMonth,
+        until: card.repeatUntil,
+        remaining: card.repeatRemaining,
+      }),
       source: resolveCardSource(card),
       cover: card.cover,
       hasDescription: !RichTextUtil.isEmpty(card.description),
@@ -450,12 +454,30 @@ export class BoardCardService {
   private async spawnRepeat(card: Task, completedAt: Date) {
     if (!card.repeatUnit || !card.repeatInterval) return null;
 
+    /*
+     * Múi giờ của CHỦ việc, không phải của máy chủ và cũng không phải của
+     * người đang bấm: lượt kế tiếp là việc của họ, phải rơi đúng thứ mà họ
+     * nhìn thấy trên lịch của mình.
+     */
+    const timeZone = await this.access.resolveTimezone(card.assigneeId);
+
     const base = card.deadline ?? completedAt;
-    const deadline = this.addInterval(
+    const deadline = nextOccurrence(
       base,
-      card.repeatUnit,
-      card.repeatInterval,
+      {
+        unit: card.repeatUnit,
+        interval: card.repeatInterval,
+        weekdays: card.repeatWeekdays,
+        dayOfMonth: card.repeatDayOfMonth,
+        until: card.repeatUntil,
+        remaining: card.repeatRemaining,
+      },
+      timeZone,
     );
+
+    // Hết chuỗi: đã tới mốc kết thúc hoặc hết số lượt. Việc vừa xong vẫn xong
+    // bình thường, chỉ là không có lượt nào nối tiếp nữa.
+    if (!deadline) return null;
 
     const position =
       (await this.cardRepository.lastPositionInList(
@@ -480,6 +502,13 @@ export class BoardCardService {
       estimateMinutes: card.estimateMinutes,
       repeatUnit: card.repeatUnit,
       repeatInterval: card.repeatInterval,
+      repeatWeekdays: card.repeatWeekdays,
+      repeatDayOfMonth: card.repeatDayOfMonth,
+      repeatUntil: card.repeatUntil,
+      // Mỗi lượt sinh ra mang số lượt còn lại ít hơn cha nó đúng một. null giữ
+      // nguyên null, tức là lặp mãi.
+      repeatRemaining:
+        card.repeatRemaining === null ? null : card.repeatRemaining - 1,
       cover: card.cover,
     });
 
@@ -494,16 +523,6 @@ export class BoardCardService {
       ActivityAction.CARD_CREATED,
       `Sinh tự động từ việc lặp ${formatTaskCode(card.seq)}`,
     );
-    return next;
-  }
-
-  private addInterval(base: Date, unit: RepeatUnit, interval: number): Date {
-    const next = new Date(base.getTime());
-    if (unit === RepeatUnit.DAY) next.setUTCDate(next.getUTCDate() + interval);
-    if (unit === RepeatUnit.WEEK)
-      next.setUTCDate(next.getUTCDate() + interval * 7);
-    if (unit === RepeatUnit.MONTH)
-      next.setUTCMonth(next.getUTCMonth() + interval);
     return next;
   }
 

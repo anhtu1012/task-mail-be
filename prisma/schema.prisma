@@ -239,6 +239,20 @@ model Task {
   estimateMinutes Int?    @map("estimate_minutes")
   repeatUnit      RepeatUnit? @map("repeat_unit")
   repeatInterval  Int?        @map("repeat_interval")
+  // Advanced recurrence. All of these only mean anything when `repeatUnit` is
+  // set; a card with no unit is not a repeating card no matter what is here.
+  //
+  // `repeatWeekdays`: 0=Sunday .. 6=Saturday, only for WEEK. Empty = keep the
+  // weekday the deadline already falls on, which is the old behaviour.
+  // `repeatDayOfMonth`: 1..31, only for MONTH. A month too short clamps to its
+  // last day (31 -> 30 in April), it never rolls into the next month.
+  // `repeatUntil` / `repeatRemaining`: when to stop. Both null = forever.
+  // `repeatRemaining` counts occurrences STILL TO COME after this one, so each
+  // spawned card carries one less than its parent and 0 ends the series.
+  repeatWeekdays   Int[]     @map("repeat_weekdays")
+  repeatDayOfMonth Int?      @map("repeat_day_of_month")
+  repeatUntil      DateTime? @map("repeat_until")
+  repeatRemaining  Int?      @map("repeat_remaining")
   // Soft delete, so the frontend's Ctrl+Z can restore a card with its
   // checklists and notes intact.
   deletedAt DateTime? @map("deleted_at")
@@ -328,6 +342,9 @@ model BoardLabel {
   boardId String @map("board_id")
   name    String
   color   String
+  // Icon name from the frontend's closed list (see LABEL_ICONS). null = the
+  // label shows as a plain colour chip, which is what every existing label is.
+  icon    String?
   // Diacritic-free form the frontend quick-add matches ("#baogia").
   slug    String
 

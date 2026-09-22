@@ -230,6 +230,7 @@ export class BoardRepository {
     boardId: string;
     name: string;
     color: string;
+    icon?: string | null;
     slug: string;
   }): Promise<BoardLabel> {
     return this.prisma.boardLabel.create({ data: input });
@@ -237,7 +238,12 @@ export class BoardRepository {
 
   updateLabel(
     id: string,
-    data: { name?: string; color?: string; slug?: string },
+    data: {
+      name?: string;
+      color?: string;
+      icon?: string | null;
+      slug?: string;
+    },
   ): Promise<BoardLabel> {
     return this.prisma.boardLabel.update({ where: { id }, data });
   }
