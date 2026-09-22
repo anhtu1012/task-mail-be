@@ -62,6 +62,9 @@ export const API_ROUTES = {
   TASK_TYPES: {
     ROOT: 'task-types',
   },
+  USERS: {
+    ROOT: 'users',
+  },
   MAIL_ACCOUNTS: {
     ROOT: 'mail-accounts',
     GOOGLE_CONNECT: 'google/connect',
