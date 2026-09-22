@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Task } from '../../generated/prisma/client';
 
@@ -15,6 +15,9 @@ type TaskWithLabels = Task & {
   assignee?: UserRef | null;
   creator?: UserRef | null;
 };
+import { BusinessException } from '../../common/exceptions/business.exception';
+import { ERROR_CODES } from '../../common/constants/error-codes.constants';
+import { ItemKind } from '../../common/enums/item-kind.enum';
 import { TaskStatus } from '../../common/enums/task-status.enum';
 import { TaskPriority } from '../../common/enums/task-priority.enum';
 import { TaskCategory } from '../../common/enums/task-category.enum';
@@ -83,6 +86,14 @@ export class TasksService {
     }
 
     const filter = {
+      /*
+       * Bỏ trống `kind` = CHỈ việc, không phải cả hai.
+       *
+       * Mặc định như vậy để mọi màn viết trước khi có sự kiện (Công việc,
+       * Kanban, Tổng quan) giữ nguyên hành vi — thêm một khái niệm mới không
+       * được phép làm dữ liệu lạ tự chui vào chúng. Lịch gửi `kind=ALL`.
+       */
+      kind: query.kind === 'ALL' ? undefined : (query.kind ?? ItemKind.TASK),
       assigneeId,
       projectId: query.projectId,
       status: query.status,
@@ -113,6 +124,57 @@ export class TasksService {
     return this.toResponse(task);
   }
 
+  /**
+   * Các cột thời gian, dựng theo LOẠI — một chỗ duy nhất giữ bất biến của mô
+   * hình (xem ghi chú ở model Task).
+   *
+   * TASK: chỉ `deadline`. EVENT: `startAt`..`endAt`, và `deadline` được nhân
+   * bản từ `startAt` để bộ nhắc deadline sẵn có (cron Zalo) bắn được cho cả
+   * sự kiện mà không phải viết thêm một bộ nhắc thứ hai.
+   */
+  private timeColumns(dto: {
+    kind?: ItemKind;
+    startAt?: string;
+    endAt?: string;
+    allDay?: boolean;
+    deadline?: string;
+  }) {
+    if (dto.kind !== ItemKind.EVENT) {
+      return {
+        kind: ItemKind.TASK,
+        startAt: null,
+        endAt: null,
+        allDay: false,
+        deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+      };
+    }
+
+    if (!dto.startAt || !dto.endAt) {
+      throw new BusinessException(
+        'Sự kiện phải có thời gian bắt đầu và kết thúc',
+        ERROR_CODES.VALIDATION_FAILED,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const startAt = new Date(dto.startAt);
+    const endAt = new Date(dto.endAt);
+    if (endAt.getTime() < startAt.getTime()) {
+      throw new BusinessException(
+        'Thời gian kết thúc phải sau thời gian bắt đầu',
+        ERROR_CODES.VALIDATION_FAILED,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return {
+      kind: ItemKind.EVENT,
+      startAt,
+      endAt,
+      allDay: dto.allDay ?? false,
+      deadline: startAt,
+    };
+  }
+
   async create(
     user: JwtAccessPayload,
     dto: CreateTaskDto,
@@ -139,6 +201,8 @@ export class TasksService {
       await this.boardService.assertLabelsInBoard(board.id, dto.labelIds);
     }
 
+    const times = this.timeColumns(dto);
+
     const task = await this.taskRepository.create({
       title: dto.title,
       description: RichTextUtil.sanitize(dto.description),
@@ -150,12 +214,17 @@ export class TasksService {
       assigneeId,
       creatorId: user.sub,
       projectId: project.id,
-      boardId: board.id,
       cover: dto.cover,
       estimateMinutes: dto.estimateMinutes,
       ...repeatColumns(dto.repeat),
       assignedAt: dto.assignedAt ? new Date(dto.assignedAt) : undefined,
-      deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+      ...times,
+      /*
+       * Sự kiện KHÔNG vào bảng công việc: bảng là nơi làm việc, không phải nơi
+       * xem lịch hẹn. Mọi truy vấn bảng đều lọc theo `boardId`, nên `null` ở
+       * đây là đủ để nó không bao giờ xuất hiện trong Hộp thư đến.
+       */
+      boardId: times.kind === ItemKind.EVENT ? null : board.id,
     });
 
     if (dto.labelIds?.length) {
@@ -218,7 +287,24 @@ export class TasksService {
       // `null`) thì ghi đè trọn bộ cột — xem repeatColumns.
       ...(dto.repeat === undefined ? {} : repeatColumns(dto.repeat)),
       assignedAt: dto.assignedAt ? new Date(dto.assignedAt) : undefined,
-      deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+      /*
+       * Sửa mốc thời gian: giữ đúng loại của bản ghi, KHÔNG cho đổi TASK
+       * thành EVENT bằng một lệnh PATCH.
+       *
+       * Đổi loại nghe thì tiện nhưng kéo theo cả một dây: việc đang nằm trong
+       * một cột của bảng phải bị gỡ ra, `completedAt` mất nghĩa, và ràng buộc
+       * CHECK ở DB sẽ chặn nếu quên dọn cột nào. Ai muốn đổi thì xoá rồi tạo
+       * lại — hiếm và rõ ràng hơn nhiều.
+       */
+      ...(task.kind === ItemKind.EVENT
+        ? this.timeColumns({
+            kind: ItemKind.EVENT,
+            // Không gửi thì giữ nguyên mốc cũ
+            startAt: dto.startAt ?? task.startAt?.toISOString(),
+            endAt: dto.endAt ?? task.endAt?.toISOString(),
+            allDay: dto.allDay ?? task.allDay,
+          })
+        : { deadline: dto.deadline ? new Date(dto.deadline) : undefined }),
       status: dto.status,
       completedAt: completingNow
         ? new Date()
@@ -459,6 +545,10 @@ export class TasksService {
       creator: task.creator ?? null,
       assignedAt: task.assignedAt,
       deadline: task.deadline,
+      kind: task.kind,
+      startAt: task.startAt,
+      endAt: task.endAt,
+      allDay: task.allDay,
       completedAt: task.completedAt,
       attachments: task.attachments,
       sourceMailAccountId: task.sourceMailAccountId,

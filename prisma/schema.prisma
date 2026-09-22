@@ -189,8 +189,23 @@ model TaskType {
   @@map("task_types")
 }
 
+/// Việc (TASK) và sự kiện lịch (EVENT) dùng CHUNG một bảng.
+///
+/// Vì sao không tách bảng riêng: sự kiện cần đúng những thứ việc đang có —
+/// nhãn, ghi chú, đính kèm, thuộc dự án, nhắc qua Zalo. Tách ra là nhân đôi cả
+/// bảy quan hệ đó cùng toàn bộ tầng quyền.
+///
+/// Khác nhau ở MỐC THỜI GIAN, và đây là bất biến quan trọng nhất của mô hình:
+///   - TASK  : `deadline` = hạn chót (một mốc). `startAt`/`endAt` bỏ trống.
+///   - EVENT : `startAt`..`endAt` = khoảng thời gian. `deadline` được **nhân
+///     bản từ `startAt`** để bộ nhắc deadline sẵn có bắn được cho cả sự kiện —
+///     giao diện KHÔNG đọc `deadline` của EVENT.
+///
+/// EVENT luôn có `boardId = null`: bảng công việc là nơi làm việc, không phải
+/// nơi xem lịch hẹn, và mọi truy vấn bảng đều lọc theo `boardId`.
 model Task {
   id          String  @id @default(uuid())
+  kind        ItemKind @default(TASK)
   // Sequential number used to render a human-friendly code (e.g. TSK-000123).
   seq         Int     @default(autoincrement())
   title       String
@@ -211,6 +226,12 @@ model Task {
   assignedAt  DateTime? @map("assigned_at")
   deadline    DateTime? @map("deadline")
   completedAt DateTime? @map("completed_at")
+
+  // Chỉ dùng cho EVENT — xem ghi chú ở đầu model.
+  startAt DateTime? @map("start_at")
+  endAt   DateTime? @map("end_at")
+  /// Sự kiện cả ngày: giao diện bỏ qua phần giờ, lịch vẽ thành thanh ngang.
+  allDay  Boolean   @default(false) @map("all_day")
 
   // Groundwork for a future Lark (Feishu) sync integration; unused today.
   externalSyncStatus String? @map("external_sync_status")
@@ -283,7 +304,15 @@ model Task {
   @@index([boardId, listId])
   @@index([boardId, deadline])
   @@index([projectId, status])
+  /// Lịch đọc theo khoảng: "sự kiện nào của dự án này chạm vào tháng đang xem"
+  @@index([projectId, kind, startAt])
   @@map("tasks")
+}
+
+/// Phân biệt việc cần làm với sự kiện trên lịch — xem ghi chú ở model Task.
+enum ItemKind {
+  TASK
+  EVENT
 }
 
 enum RepeatUnit {
