@@ -2,6 +2,7 @@ import { DeadlineUtil } from '../../../common/utils/deadline.util';
 import { RichTextUtil } from '../../../common/utils/rich-text.util';
 import type { CardSummaryRow } from '../repositories/board-card.repository';
 import {
+  CardRepeatDto,
   CardSource,
   CardSummaryDto,
   BoardDto,
@@ -46,10 +47,14 @@ export const toCardSummary = (row: CardSummaryRow): CardSummaryDto => ({
   }),
   completedAt: row.completed_at,
   estimateMinutes: row.estimate_minutes,
-  repeat:
-    row.repeat_unit && row.repeat_interval
-      ? { unit: row.repeat_unit, interval: row.repeat_interval }
-      : null,
+  repeat: toRepeatDto({
+    unit: row.repeat_unit,
+    interval: row.repeat_interval,
+    weekdays: row.repeat_weekdays,
+    dayOfMonth: row.repeat_day_of_month,
+    until: row.repeat_until,
+    remaining: row.repeat_remaining,
+  }),
   source: resolveCardSource({
     sourceMailAccountId: row.source_mail_account_id,
     externalRef: row.external_ref,
@@ -83,6 +88,10 @@ export const toCardSummaryFromEntity = (
     estimateMinutes: number | null;
     repeatUnit: string | null;
     repeatInterval: number | null;
+    repeatWeekdays: number[];
+    repeatDayOfMonth: number | null;
+    repeatUntil: Date | null;
+    repeatRemaining: number | null;
     cover: string | null;
     description: string | null;
     sourceMailAccountId: string | null;
@@ -115,10 +124,14 @@ export const toCardSummaryFromEntity = (
     }),
     completedAt: task.completedAt,
     estimateMinutes: task.estimateMinutes,
-    repeat:
-      task.repeatUnit && task.repeatInterval
-        ? { unit: task.repeatUnit, interval: task.repeatInterval }
-        : null,
+    repeat: toRepeatDto({
+      unit: task.repeatUnit,
+      interval: task.repeatInterval,
+      weekdays: task.repeatWeekdays,
+      dayOfMonth: task.repeatDayOfMonth,
+      until: task.repeatUntil,
+      remaining: task.repeatRemaining,
+    }),
     source: resolveCardSource(task),
     cover: task.cover,
     hasDescription: !RichTextUtil.isEmpty(task.description),
@@ -152,5 +165,32 @@ export const toLabelDto = (label: BoardLabel): BoardLabelDto => ({
   boardId: label.boardId,
   name: label.name,
   color: label.color,
+  icon: label.icon,
   slug: label.slug,
 });
+
+/**
+ * Một chỗ duy nhất dựng `CardRepeatDto`.
+ *
+ * Luật: **không có `unit` hoặc `interval` thì không phải việc lặp**, mọi cột
+ * nâng cao còn lại bị bỏ qua. Nhờ vậy một hàng có sót `repeat_until` từ lần
+ * người dùng tắt lặp không biến thẻ thành thẻ lặp trở lại.
+ */
+export const toRepeatDto = (row: {
+  unit: string | null;
+  interval: number | null;
+  weekdays: number[] | null;
+  dayOfMonth: number | null;
+  until: Date | null;
+  remaining: number | null;
+}): CardRepeatDto | null =>
+  row.unit && row.interval
+    ? {
+        unit: row.unit,
+        interval: row.interval,
+        weekdays: row.weekdays ?? [],
+        dayOfMonth: row.dayOfMonth,
+        until: row.until,
+        remaining: row.remaining,
+      }
+    : null;

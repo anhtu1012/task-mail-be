@@ -16,6 +16,7 @@ import { BoardAccessService } from '../board/services/board-access.service';
 import { BoardService } from '../board/services/board.service';
 import { ActivityService } from '../board/services/activity.service';
 import { ProjectAccessService } from '../projects/services/project-access.service';
+import { repeatColumns } from '../../common/utils/recurrence.util';
 import { TaskRepository } from './repositories/task.repository';
 import {
   CreateTaskDto,
@@ -137,8 +138,7 @@ export class TasksService {
       boardId: board.id,
       cover: dto.cover,
       estimateMinutes: dto.estimateMinutes,
-      repeatUnit: dto.repeat?.unit ?? null,
-      repeatInterval: dto.repeat?.interval ?? null,
+      ...repeatColumns(dto.repeat),
       assignedAt: dto.assignedAt ? new Date(dto.assignedAt) : undefined,
       deadline: dto.deadline ? new Date(dto.deadline) : undefined,
     });
@@ -199,10 +199,9 @@ export class TasksService {
       attachments: dto.attachments,
       cover: dto.cover,
       estimateMinutes: dto.estimateMinutes,
-      repeatUnit:
-        dto.repeat === undefined ? undefined : (dto.repeat?.unit ?? null),
-      repeatInterval:
-        dto.repeat === undefined ? undefined : (dto.repeat?.interval ?? null),
+      // `undefined` = client không nhắc tới lặp, giữ nguyên. Có nhắc (kể cả
+      // `null`) thì ghi đè trọn bộ cột — xem repeatColumns.
+      ...(dto.repeat === undefined ? {} : repeatColumns(dto.repeat)),
       assignedAt: dto.assignedAt ? new Date(dto.assignedAt) : undefined,
       deadline: dto.deadline ? new Date(dto.deadline) : undefined,
       status: dto.status,

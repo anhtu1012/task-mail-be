@@ -5,8 +5,10 @@ import {
 } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsDateString,
   IsEnum,
   IsHexColor,
@@ -20,12 +22,16 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { TaskPriority } from '../../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../../common/enums/task-status.enum';
 import { TaskCategory } from '../../../common/enums/task-category.enum';
-import { MAX_CARDS_PER_LIST } from '../../../common/constants/board.constants';
+import {
+  LABEL_ICONS,
+  MAX_CARDS_PER_LIST,
+} from '../../../common/constants/board.constants';
 
 export class UpdateBoardDto {
   @ApiPropertyOptional()
@@ -109,6 +115,44 @@ export class CardRepeatDtoInput {
   @Min(1)
   @Max(365)
   interval: number;
+
+  /**
+   * Các trường dưới đây là phần "lặp nâng cao". Đều tuỳ chọn, và bỏ trống hết
+   * thì hành vi đúng bằng bản cũ: lặp mãi, giữ nguyên thứ/ngày của hạn chót.
+   */
+  @ApiPropertyOptional({
+    type: [Number],
+    description: '0=CN..6=T7, chỉ có tác dụng khi unit=WEEK',
+    example: [1, 4],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(7)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  weekdays?: number[];
+
+  @ApiPropertyOptional({ description: '1..31, chỉ có tác dụng khi unit=MONTH' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  dayOfMonth?: number | null;
+
+  @ApiPropertyOptional({ description: 'ISO — ngừng lặp sau mốc này' })
+  @IsOptional()
+  @IsDateString()
+  until?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Số lượt còn lại sau lượt hiện tại. Bỏ trống = lặp mãi',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  remaining?: number | null;
 }
 
 export class CreateCardDto {
@@ -213,6 +257,11 @@ export class CreateLabelDto {
   @ApiProperty({ example: '#e63946' })
   @IsHexColor()
   color: string;
+
+  @ApiPropertyOptional({ enum: LABEL_ICONS, example: 'tag' })
+  @IsOptional()
+  @IsIn(LABEL_ICONS as readonly string[])
+  icon?: string | null;
 }
 
 export class UpdateLabelDto {
@@ -227,6 +276,13 @@ export class UpdateLabelDto {
   @IsOptional()
   @IsHexColor()
   color?: string;
+
+  /** `null` = gỡ icon, đưa nhãn về dạng chỉ có màu */
+  @ApiPropertyOptional({ enum: LABEL_ICONS, nullable: true, example: 'tag' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(LABEL_ICONS as readonly string[])
+  icon?: string | null;
 }
 
 export class SetCardLabelsDto {
