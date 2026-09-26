@@ -26,6 +26,7 @@ import {
   CreateLabelDto,
   CreateListDto,
   ListCardsQueryDto,
+  NotesFeedQueryDto,
   ProjectScopeQueryDto,
   SearchQueryDto,
   TimezoneQueryDto,
@@ -38,6 +39,7 @@ import {
   BoardFullResponseDto,
   BoardLabelDto,
   CardPageDto,
+  NotesFeedDto,
   PositionDto,
   SearchResponseDto,
   TaskListDto,
@@ -103,6 +105,19 @@ export class BoardsController {
     @Query() query: SearchQueryDto,
   ): Promise<SearchResponseDto> {
     return this.agendaService.search(user.sub, query);
+  }
+
+  @Get(API_ROUTES.BOARDS.ME_NOTES)
+  @ApiOperation({
+    summary:
+      'Dòng ghi chú của mọi thẻ trên bảng, mới nhất trước (tab Ghi chú mobile)',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: NotesFeedDto })
+  notes(
+    @CurrentUser() user: RequestWithUser['user'],
+    @Query() query: NotesFeedQueryDto,
+  ): Promise<NotesFeedDto> {
+    return this.agendaService.notesFeed(user.sub, query);
   }
 
   @Get('me/inbox/cards')

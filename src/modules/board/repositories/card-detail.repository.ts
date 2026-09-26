@@ -98,6 +98,32 @@ export class CardDetailRepository {
 
   // --- notes ----------------------------------------------------------------
 
+  /**
+   * Ghi chú của mọi thẻ còn sống trên một bảng, mới nhất trước. Lấy dư một
+   * dòng để biết còn trang sau hay không mà không phải đếm.
+   */
+  findNotesOnBoard(boardId: string, before: Date | undefined, take: number) {
+    return this.prisma.taskNote.findMany({
+      where: {
+        task: { boardId, deletedAt: null },
+        ...(before ? { createdAt: { lt: before } } : {}),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take,
+      include: {
+        task: {
+          select: {
+            id: true,
+            seq: true,
+            title: true,
+            status: true,
+            list: { select: { title: true } },
+          },
+        },
+      },
+    });
+  }
+
   findNote(id: string): Promise<TaskNote | null> {
     return this.prisma.taskNote.findUnique({ where: { id } });
   }

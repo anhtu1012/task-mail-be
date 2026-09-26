@@ -37,6 +37,7 @@ export const API_ROUTES = {
     ME_TODAY: 'me/today',
     ME_AGENDA: 'me/agenda',
     ME_SEARCH: 'me/search',
+    ME_NOTES: 'me/notes',
     LISTS: 'lists',
     LABELS: 'labels',
   },
