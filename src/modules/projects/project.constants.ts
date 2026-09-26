@@ -27,6 +27,15 @@ export const DEFAULT_PROJECT_COLOR = '#0a436d';
 export const DEFAULT_PROJECT_CODE = 'CHUNG';
 export const DEFAULT_PROJECT_NAME = 'Công việc chung';
 
+/**
+ * "Công việc chung" là dữ liệu cứng của hệ thống: không xoá, không lưu trữ,
+ * không đổi mã. Nhận diện bằng `code` chứ không bằng `isDefault` — cờ mặc định
+ * đổi sang dự án khác được, còn mã CHUNG thì `ensureDefaultProject` dựa vào để
+ * tìm lại đúng dự án này.
+ */
+export const isSystemProject = (project: { code: string }): boolean =>
+  project.code === DEFAULT_PROJECT_CODE;
+
 export const PROJECT_CODE_PATTERN = /^[A-Z0-9]{2,8}$/;
 export const PROJECT_CODE_MIN_LENGTH = 2;
 export const PROJECT_CODE_MAX_LENGTH = 8;

@@ -23,6 +23,7 @@ import {
   DEFAULT_PROJECT_COLOR,
   DEFAULT_PROJECT_ICON,
   MAX_ACTIVE_PROJECTS_PER_USER,
+  isSystemProject,
 } from '../project.constants';
 
 /** Sắp theo tiếng Việt: "Đà Nẵng" phải đứng trước "Hà Nội", không sau "Zulu". */
@@ -30,6 +31,13 @@ const vietnameseCollator = new Intl.Collator('vi', { sensitivity: 'base' });
 
 const conflict = (message: string, errorCode: string) =>
   new BusinessException(message, errorCode, HttpStatus.CONFLICT);
+
+const systemLocked = (action: string) =>
+  new BusinessException(
+    `Dự án "Công việc chung" là dự án hệ thống, không ${action} được`,
+    ERROR_CODES.PROJECT_SYSTEM_LOCKED,
+    HttpStatus.FORBIDDEN,
+  );
 
 @Injectable()
 export class ProjectsService {
@@ -119,9 +127,11 @@ export class ProjectsService {
       await this.assertNameFree(userId, dto.name);
     }
     if (dto.code !== undefined && dto.code !== project.code) {
+      if (isSystemProject(project)) throw systemLocked('đổi mã');
       await this.assertCodeFree(userId, dto.code);
     }
     if (dto.archived === true && !project.archived) {
+      if (isSystemProject(project)) throw systemLocked('lưu trữ');
       await this.prepareForArchive(userId, project);
     }
 
@@ -164,6 +174,7 @@ export class ProjectsService {
     const project = await this.access.requireOwnProject(userId, projectId);
 
     if (dto.archived && !project.archived) {
+      if (isSystemProject(project)) throw systemLocked('lưu trữ');
       await this.prepareForArchive(userId, project);
     }
 
@@ -184,6 +195,7 @@ export class ProjectsService {
 
   async remove(userId: string, projectId: string): Promise<void> {
     const project = await this.access.requireOwnProject(userId, projectId);
+    if (isSystemProject(project)) throw systemLocked('xoá');
 
     // Kể cả việc đã xoá mềm: thẻ trong thùng rác vẫn khôi phục được bằng
     // Ctrl+Z, nên nó vẫn tính là "dự án còn việc".
