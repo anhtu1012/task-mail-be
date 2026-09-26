@@ -72,8 +72,10 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
     return result ?? null;
   }
 
-  async sendTextMessage(chatId: string, text: string): Promise<void> {
-    await this.call('sendMessage', { chat_id: chatId, text });
+  /** Trả về true nếu Zalo xác nhận đã gửi. */
+  async sendTextMessage(chatId: string, text: string): Promise<boolean> {
+    const result = await this.call('sendMessage', { chat_id: chatId, text });
+    return result !== undefined;
   }
 
   private async pollLoop(): Promise<void> {

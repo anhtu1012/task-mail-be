@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ZaloAccountsController } from './zalo-accounts.controller';
 import { ZaloBotController } from './zalo-bot.controller';
 import { ZaloBotService } from './zalo-bot.service';
+import { ZaloBroadcastService } from './zalo-broadcast.service';
 import { ZaloLinkService } from './zalo-link.service';
 import { ZaloNotificationListener } from './zalo-notification.listener';
 import { ZaloAccountRepository } from './repositories/zalo-account.repository';
@@ -14,6 +15,7 @@ import { UsersModule } from '../users/users.module';
   controllers: [ZaloAccountsController, ZaloBotController],
   providers: [
     ZaloBotService,
+    ZaloBroadcastService,
     ZaloLinkService,
     ZaloNotificationListener,
     ZaloAccountRepository,
