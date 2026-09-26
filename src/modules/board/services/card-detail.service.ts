@@ -207,10 +207,17 @@ export class CardDetailService {
     dto: UpdateAttachmentDto,
   ): Promise<TaskAttachmentDto> {
     const attachment = await this.requireAttachment(userId, attachmentId);
-    const updated =
-      dto.isCover === true
-        ? await this.repository.setCover(attachment.taskId, attachment.id)
-        : await this.repository.clearCover(attachment.id);
+    let updated = attachment;
+    if (dto.name !== undefined) {
+      updated = await this.repository.renameAttachment(attachment.id, dto.name);
+    }
+    // Chỉ đụng tới ảnh bìa khi body có `isCover` — đổi tên thôi thì ảnh bìa
+    // phải giữ nguyên, không bị bỏ ngầm.
+    if (dto.isCover === true) {
+      updated = await this.repository.setCover(attachment.taskId, attachment.id);
+    } else if (dto.isCover === false) {
+      updated = await this.repository.clearCover(attachment.id);
+    }
     return this.toAttachmentDto(updated);
   }
 

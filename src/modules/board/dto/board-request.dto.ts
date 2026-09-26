@@ -373,6 +373,13 @@ export class CreateAttachmentDto {
 }
 
 export class UpdateAttachmentDto {
+  @ApiPropertyOptional({ example: 'Hợp đồng v3.pdf' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

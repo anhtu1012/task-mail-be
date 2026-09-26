@@ -151,6 +151,13 @@ export class CardDetailRepository {
     return updated;
   }
 
+  renameAttachment(id: string, name: string): Promise<TaskAttachment> {
+    return this.prisma.taskAttachment.update({
+      where: { id },
+      data: { name },
+    });
+  }
+
   clearCover(id: string): Promise<TaskAttachment> {
     return this.prisma.taskAttachment.update({
       where: { id },

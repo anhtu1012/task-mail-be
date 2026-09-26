@@ -152,7 +152,9 @@ export class TaskAttachmentsController {
   constructor(private readonly service: CardDetailService) {}
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Đặt / bỏ ảnh bìa (mỗi thẻ chỉ một ảnh bìa)' })
+  @ApiOperation({
+    summary: 'Đổi tên / đặt / bỏ ảnh bìa (mỗi thẻ chỉ một ảnh bìa)',
+  })
   @ApiResponse({ status: HttpStatus.OK, type: TaskAttachmentDto })
   update(
     @CurrentUser() user: RequestWithUser['user'],
