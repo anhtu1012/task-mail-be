@@ -39,6 +39,17 @@ export class CardDetailRepository {
     return this.prisma.checklist.create({ data: input });
   }
 
+  updateChecklist(
+    id: string,
+    data: { title?: string },
+  ): Promise<Checklist & { items: ChecklistItem[] }> {
+    return this.prisma.checklist.update({
+      where: { id },
+      data,
+      include: { items: { orderBy: { position: 'asc' } } },
+    });
+  }
+
   async deleteChecklist(id: string): Promise<void> {
     await this.prisma.checklist.delete({ where: { id } });
   }

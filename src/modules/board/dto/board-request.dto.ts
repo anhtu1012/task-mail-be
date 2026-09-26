@@ -300,6 +300,14 @@ export class CreateChecklistDto {
   title: string;
 }
 
+export class UpdateChecklistDto {
+  @ApiProperty({ example: 'Chuẩn bị tài liệu' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  title: string;
+}
+
 export class CreateChecklistItemDto {
   @ApiProperty()
   @IsString()

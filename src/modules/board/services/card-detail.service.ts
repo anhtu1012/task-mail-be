@@ -8,6 +8,7 @@ import {
   CreateChecklistDto,
   CreateChecklistItemDto,
   UpdateAttachmentDto,
+  UpdateChecklistDto,
   UpdateChecklistItemDto,
   UpsertNoteDto,
 } from '../dto/board-request.dto';
@@ -50,6 +51,24 @@ export class CardDetailService {
       title: checklist.title,
       position: checklist.position,
       items: [],
+    };
+  }
+
+  async updateChecklist(
+    userId: string,
+    checklistId: string,
+    dto: UpdateChecklistDto,
+  ): Promise<ChecklistDto> {
+    const checklist = await this.requireChecklist(userId, checklistId);
+    const updated = await this.repository.updateChecklist(checklist.id, {
+      title: dto.title,
+    });
+    return {
+      id: updated.id,
+      taskId: updated.taskId,
+      title: updated.title,
+      position: updated.position,
+      items: updated.items.map((item) => this.toItemDto(item)),
     };
   }
 
