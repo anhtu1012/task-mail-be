@@ -3,22 +3,30 @@ import { ERROR_CODES } from '../../../common/constants/error-codes.constants';
 import { BusinessException } from '../../../common/exceptions/business.exception';
 import { TimezoneUtil } from '../../../common/utils/timezone.util';
 import { StringUtil } from '../../../common/utils/string.util';
-import { AgendaQueryDto, SearchQueryDto } from '../dto/board-request.dto';
+import {
+  AgendaQueryDto,
+  NotesFeedQueryDto,
+  SearchQueryDto,
+} from '../dto/board-request.dto';
 import {
   AgendaResponseDto,
+  NotesFeedDto,
   SearchResponseDto,
 } from '../dto/board-response.dto';
-import { toCardSummary } from '../mappers/card.mapper';
+import { formatTaskCode, toCardSummary } from '../mappers/card.mapper';
 import { BoardCardRepository } from '../repositories/board-card.repository';
+import { CardDetailRepository } from '../repositories/card-detail.repository';
 import { BoardAccessService } from './board-access.service';
 import { BoardService } from './board.service';
 
 const DEFAULT_SEARCH_LIMIT = 8;
+const DEFAULT_NOTES_LIMIT = 20;
 
 @Injectable()
 export class BoardAgendaService {
   constructor(
     private readonly cardRepository: BoardCardRepository,
+    private readonly detailRepository: CardDetailRepository,
     private readonly access: BoardAccessService,
     private readonly boardService: BoardService,
   ) {}
@@ -101,5 +109,51 @@ export class BoardAgendaService {
     ]);
 
     return { items: rows.map(toCardSummary), total };
+  }
+
+  /**
+   * Dòng ghi chú của mọi thẻ trên bảng của dự án đang mở — tab "Ghi chú" trên
+   * mobile. Ghi chú không có cột người viết: nó thuộc thẻ, mà thẻ nằm trên bảng
+   * riêng của từng người, nên lọc theo bảng đã là "ghi chú của tôi".
+   *
+   * Phân trang theo `createdAt` (không theo offset) để ghi chú mới thêm lúc
+   * đang cuộn không làm trang sau lặp lại dòng cũ.
+   */
+  async notesFeed(
+    userId: string,
+    query: NotesFeedQueryDto,
+  ): Promise<NotesFeedDto> {
+    const { board } = await this.access.resolveBoardForRead(
+      userId,
+      query.projectId,
+    );
+    const limit = query.limit ?? DEFAULT_NOTES_LIMIT;
+    const rows = await this.detailRepository.findNotesOnBoard(
+      board.id,
+      query.before ? new Date(query.before) : undefined,
+      limit + 1,
+    );
+
+    const page = rows.slice(0, limit);
+    return {
+      items: page.map((note) => ({
+        id: note.id,
+        taskId: note.taskId,
+        content: note.content,
+        createdAt: note.createdAt,
+        editedAt: note.editedAt,
+        card: {
+          id: note.task.id,
+          code: formatTaskCode(note.task.seq),
+          title: note.task.title,
+          status: note.task.status,
+          listTitle: note.task.list?.title ?? null,
+        },
+      })),
+      nextCursor:
+        rows.length > limit
+          ? (page.at(-1)?.createdAt.toISOString() ?? null)
+          : null,
+    };
   }
 }

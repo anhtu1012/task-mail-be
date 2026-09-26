@@ -463,6 +463,25 @@ export class SearchQueryDto extends ProjectScopeQueryDto {
   limit?: number;
 }
 
+/** `GET /boards/me/notes` — dòng ghi chú của mọi thẻ, mới nhất trước */
+export class NotesFeedQueryDto extends ProjectScopeQueryDto {
+  @ApiPropertyOptional({
+    description:
+      '`nextCursor` của trang trước (ISO createdAt); bỏ trống = trang đầu',
+  })
+  @IsOptional()
+  @IsDateString()
+  before?: string;
+
+  @ApiPropertyOptional({ default: 20, maximum: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
 /**
  * `?undo=true` bỏ bước ghi `TaskActivity`, để Ctrl+Z không làm rác nhật ký
  * (mục 5.7.3 của đặc tả).

@@ -171,6 +171,28 @@ export class TaskNoteDto {
   @ApiPropertyOptional() editedAt: Date | null;
 }
 
+/** Thẻ chứa ghi chú — đủ để hiện tên và mở thẻ, không kéo cả CardSummary */
+export class NoteFeedCardDto {
+  @ApiProperty() id: string;
+  @ApiProperty({ example: 'TSK-000123' }) code: string;
+  @ApiProperty() title: string;
+  @ApiProperty({ enum: TaskStatus }) status: TaskStatus;
+  @ApiPropertyOptional({ description: 'null = đang ở Hộp thư đến' })
+  listTitle: string | null;
+}
+
+export class NoteFeedItemDto extends TaskNoteDto {
+  @ApiProperty({ type: NoteFeedCardDto }) card: NoteFeedCardDto;
+}
+
+export class NotesFeedDto {
+  @ApiProperty({ type: [NoteFeedItemDto] }) items: NoteFeedItemDto[];
+  @ApiPropertyOptional({
+    description: 'Truyền vào `before` để lấy trang kế; null = hết',
+  })
+  nextCursor: string | null;
+}
+
 export class TaskAttachmentDto {
   @ApiProperty() id: string;
   @ApiProperty() taskId: string;

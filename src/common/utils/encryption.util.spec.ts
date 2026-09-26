@@ -27,7 +27,13 @@ describe('EncryptionUtil', () => {
   it('throws when the ciphertext has been tampered with', () => {
     const encrypted = EncryptionUtil.encrypt('secret', key);
     const [iv, authTag, cipherText] = encrypted.split(':');
-    const tampered = [iv, authTag, cipherText.slice(0, -2) + '00'].join(':');
+    const lastByte = cipherText.slice(-2);
+    // Đảm bảo byte cuối luôn thực sự đổi khác — flip thay vì ép cứng '00', vì
+    // '00' trùng ngẫu nhiên với ciphertext gốc (~1/256 lần) khiến test flaky.
+    const flippedByte = lastByte === '00' ? '01' : '00';
+    const tampered = [iv, authTag, cipherText.slice(0, -2) + flippedByte].join(
+      ':',
+    );
     expect(() => EncryptionUtil.decrypt(tampered, key)).toThrow();
   });
 });
