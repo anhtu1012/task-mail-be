@@ -300,6 +300,14 @@ export class CreateChecklistDto {
   title: string;
 }
 
+export class UpdateChecklistDto {
+  @ApiProperty({ example: 'Chuẩn bị tài liệu' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  title: string;
+}
+
 export class CreateChecklistItemDto {
   @ApiProperty()
   @IsString()
@@ -365,6 +373,13 @@ export class CreateAttachmentDto {
 }
 
 export class UpdateAttachmentDto {
+  @ApiPropertyOptional({ example: 'Hợp đồng v3.pdf' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

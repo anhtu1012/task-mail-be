@@ -24,10 +24,12 @@ import {
   CreateChecklistItemDto,
   UndoFlagQueryDto,
   UpdateAttachmentDto,
+  UpdateChecklistDto,
   UpdateChecklistItemDto,
   UpsertNoteDto,
 } from '../dto/board-request.dto';
 import {
+  ChecklistDto,
   ChecklistItemDto,
   TaskAttachmentDto,
   TaskNoteDto,
@@ -39,6 +41,17 @@ import { CardDetailService } from '../services/card-detail.service';
 @Controller(API_ROUTES.CHECKLISTS.ROOT)
 export class ChecklistsController {
   constructor(private readonly service: CardDetailService) {}
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Đổi tên checklist' })
+  @ApiResponse({ status: HttpStatus.OK, type: ChecklistDto })
+  update(
+    @CurrentUser() user: RequestWithUser['user'],
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateChecklistDto,
+  ): Promise<ChecklistDto> {
+    return this.service.updateChecklist(user.sub, id, dto);
+  }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Xoá checklist cùng toàn bộ mục bên trong' })
@@ -139,7 +152,9 @@ export class TaskAttachmentsController {
   constructor(private readonly service: CardDetailService) {}
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Đặt / bỏ ảnh bìa (mỗi thẻ chỉ một ảnh bìa)' })
+  @ApiOperation({
+    summary: 'Đổi tên / đặt / bỏ ảnh bìa (mỗi thẻ chỉ một ảnh bìa)',
+  })
   @ApiResponse({ status: HttpStatus.OK, type: TaskAttachmentDto })
   update(
     @CurrentUser() user: RequestWithUser['user'],
