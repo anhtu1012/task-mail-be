@@ -19,6 +19,7 @@ import { ZaloAccountRepository } from './repositories/zalo-account.repository';
 import {
   ZaloBroadcastDto,
   ZaloBroadcastResponseDto,
+  ZaloRecipientDto,
 } from './dto/zalo-broadcast.dto';
 import { API_ROUTES } from '../../common/constants/api-routes.constants';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -58,6 +59,13 @@ export class ZaloBotController {
       : { connected: false, linkedUsers };
   }
 
+  @Get(API_ROUTES.ZALO_BOT.RECIPIENTS)
+  @ApiOperation({ summary: 'List users who linked Zalo (broadcast targets)' })
+  @ApiResponse({ status: HttpStatus.OK, type: [ZaloRecipientDto] })
+  recipients(): Promise<ZaloRecipientDto[]> {
+    return this.zaloBroadcastService.listRecipients();
+  }
+
   @Post(API_ROUTES.ZALO_BOT.BROADCAST)
   @ApiOperation({
     summary:
@@ -71,6 +79,7 @@ export class ZaloBotController {
   ): Promise<ZaloBroadcastResponseDto> {
     return this.zaloBroadcastService.broadcast(dto.message.trim(), {
       testOnly: dto.testOnly,
+      userIds: dto.userIds,
       requesterId: user.sub,
     });
   }

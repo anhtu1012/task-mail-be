@@ -80,5 +80,6 @@ export const API_ROUTES = {
     ROOT: 'zalo-bot',
     STATUS: 'status',
     BROADCAST: 'broadcast',
+    RECIPIENTS: 'recipients',
   },
 } as const;

@@ -1,14 +1,17 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ZaloBotService } from './zalo-bot.service';
 import { ZaloAccountRepository } from './repositories/zalo-account.repository';
-import { ZaloBroadcastResponseDto } from './dto/zalo-broadcast.dto';
+import {
+  ZaloBroadcastResponseDto,
+  ZaloRecipientDto,
+} from './dto/zalo-broadcast.dto';
 
 // Giãn cách giữa các tin để không chạm rate limit của Zalo Bot API.
 const SEND_INTERVAL_MS = 150;
 
 /**
- * Gửi thông báo hệ thống (bản cập nhật, hướng dẫn tải app…) tới mọi user đã
- * liên kết Zalo. Không lưu lịch sử — chỉ gửi và trả về thống kê.
+ * Gửi thông báo hệ thống (bản cập nhật, hướng dẫn tải app…) tới user đã liên
+ * kết Zalo — tất cả hoặc những người admin chọn. Không lưu lịch sử — chỉ gửi và trả về thống kê.
  */
 @Injectable()
 export class ZaloBroadcastService {
@@ -21,11 +24,13 @@ export class ZaloBroadcastService {
 
   async broadcast(
     message: string,
-    options: { testOnly?: boolean; requesterId: string },
+    options: { testOnly?: boolean; userIds?: string[]; requesterId: string },
   ): Promise<ZaloBroadcastResponseDto> {
     const recipients = options.testOnly
       ? await this.findRequesterAccount(options.requesterId)
-      : await this.zaloAccountRepository.findAll();
+      : options.userIds
+        ? await this.zaloAccountRepository.findByUserIds(options.userIds)
+        : await this.zaloAccountRepository.findAll();
 
     let sent = 0;
     for (const [index, account] of recipients.entries()) {
@@ -44,6 +49,15 @@ export class ZaloBroadcastService {
       `Broadcast Zalo${options.testOnly ? ' (gửi thử)' : ''}: ${sent}/${recipients.length} thành công`,
     );
     return { total: recipients.length, sent, failed };
+  }
+
+  async listRecipients(): Promise<ZaloRecipientDto[]> {
+    const accounts = await this.zaloAccountRepository.findAllWithEmail();
+    return accounts.map((account) => ({
+      userId: account.userId,
+      email: account.user.email,
+      linkedAt: account.linkedAt,
+    }));
   }
 
   private async findRequesterAccount(userId: string) {

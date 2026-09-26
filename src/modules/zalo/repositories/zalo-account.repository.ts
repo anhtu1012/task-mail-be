@@ -18,6 +18,20 @@ export class ZaloAccountRepository {
     return this.prisma.zaloAccount.findMany();
   }
 
+  findByUserIds(userIds: string[]): Promise<ZaloAccount[]> {
+    return this.prisma.zaloAccount.findMany({
+      where: { userId: { in: userIds } },
+    });
+  }
+
+  /** Danh sách người đã liên kết kèm email — để admin chọn người nhận. */
+  findAllWithEmail(): Promise<(ZaloAccount & { user: { email: string } })[]> {
+    return this.prisma.zaloAccount.findMany({
+      include: { user: { select: { email: true } } },
+      orderBy: { user: { email: 'asc' } },
+    });
+  }
+
   count(): Promise<number> {
     return this.prisma.zaloAccount.count();
   }

@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsBoolean,
+  IsUUID,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -27,6 +30,28 @@ export class ZaloBroadcastDto {
   @IsOptional()
   @IsBoolean()
   testOnly?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Chỉ gửi cho các user này (phải đã liên kết Zalo). Bỏ trống = gửi tất cả',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('all', { each: true })
+  userIds?: string[];
+}
+
+export class ZaloRecipientDto {
+  @ApiProperty()
+  userId: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty()
+  linkedAt: Date;
 }
 
 export class ZaloBroadcastResponseDto {
