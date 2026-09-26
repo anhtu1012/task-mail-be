@@ -11,6 +11,7 @@ import type { TaskCreatedEvent } from '../tasks/events/task-created.event';
 import { TaskResponseDto } from '../tasks/dto/task-response.dto';
 import { ZaloConfig } from '../../config/zalo.config';
 import { GoogleOAuthConfig } from '../../config/google.config';
+import { RichTextUtil } from '../../common/utils/rich-text.util';
 
 const MAX_DESCRIPTION_LENGTH = 1000;
 
@@ -35,11 +36,13 @@ export function formatDeadline(
 }
 
 function formatDescription(description?: string | null): string {
-  const trimmed = description?.trim();
-  if (!trimmed) return '(không có mô tả)';
-  return trimmed.length > MAX_DESCRIPTION_LENGTH
-    ? `${trimmed.slice(0, MAX_DESCRIPTION_LENGTH)}…`
-    : trimmed;
+  // Task description là HTML từ Quill editor (xem `rich-text.util.ts`) — gửi
+  // thẳng ra Zalo sẽ hiện nguyên thẻ <p>, <a>...
+  const plain = RichTextUtil.toPlainText(description).trim();
+  if (!plain) return '(không có mô tả)';
+  return plain.length > MAX_DESCRIPTION_LENGTH
+    ? `${plain.slice(0, MAX_DESCRIPTION_LENGTH)}…`
+    : plain;
 }
 
 function formatNewTaskMessage(

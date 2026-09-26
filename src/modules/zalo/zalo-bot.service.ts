@@ -134,12 +134,17 @@ export class ZaloBotService implements OnModuleInit, OnModuleDestroy {
       chatId &&
       typeof message.text === 'string'
     ) {
-      const linked = await this.zaloLinkService.confirmLink(
+      const result = await this.zaloLinkService.confirmLink(
         message.text,
         chatId,
       );
-      if (linked) {
+      if (result === 'linked') {
         await this.sendTextMessage(chatId, 'Liên kết tài khoản thành công!');
+      } else if (result === 'already_linked') {
+        await this.sendTextMessage(
+          chatId,
+          'Tài khoản Zalo này đã được liên kết với một tài khoản khác. Vui lòng hủy liên kết cũ trước khi kết nối lại.',
+        );
       }
     }
   }

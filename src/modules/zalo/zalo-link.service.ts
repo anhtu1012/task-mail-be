@@ -5,6 +5,8 @@ import { ZaloAccountRepository } from './repositories/zalo-account.repository';
 
 const LINK_CODE_TTL_MS = 10 * 60 * 1000;
 
+export type ConfirmLinkResult = 'linked' | 'invalid_code' | 'already_linked';
+
 @Injectable()
 export class ZaloLinkService {
   constructor(
@@ -22,13 +24,30 @@ export class ZaloLinkService {
     return { code, expiresAt };
   }
 
-  /** Matches an inbound Zalo message against a pending code; links on success. */
-  async confirmLink(code: string, zaloUserId: string): Promise<boolean> {
+  /**
+   * Matches an inbound Zalo message against a pending code; links on success.
+   * `zaloUserId` is unique on the account table (a Zalo chat can only shadow
+   * one app user) — checked explicitly here so a chat already linked to a
+   * different account gets a clear reply instead of a swallowed P2002 from
+   * the poll loop's `catch`.
+   */
+  async confirmLink(
+    code: string,
+    zaloUserId: string,
+  ): Promise<ConfirmLinkResult> {
     const linkCode = await this.zaloLinkCodeRepository.findByCode(code.trim());
-    if (!linkCode || linkCode.expiresAt.getTime() < Date.now()) return false;
+    if (!linkCode || linkCode.expiresAt.getTime() < Date.now()) {
+      return 'invalid_code';
+    }
+
+    const existing =
+      await this.zaloAccountRepository.findByZaloUserId(zaloUserId);
+    if (existing && existing.userId !== linkCode.userId) {
+      return 'already_linked';
+    }
 
     await this.zaloAccountRepository.upsert(linkCode.userId, zaloUserId);
     await this.zaloLinkCodeRepository.delete(linkCode.id);
-    return true;
+    return 'linked';
   }
 }
