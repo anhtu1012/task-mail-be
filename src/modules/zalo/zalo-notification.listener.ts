@@ -65,10 +65,16 @@ function formatNewTaskMessage(
 function formatDeadlineMessage(
   task: TaskResponseDto,
   timeZone: string,
+  tasksUrl?: string,
 ): string {
   return [
     `⏰ Task "${task.title}" sắp đến hạn`,
+    `Ưu tiên: ${task.priority}`,
     `Deadline: ${formatDeadline(task.deadline, timeZone)}`,
+    '',
+    'Mô tả:',
+    formatDescription(task.description),
+    ...(tasksUrl ? ['', `Xem task tại: ${tasksUrl}`] : []),
   ].join('\n');
 }
 
@@ -119,6 +125,11 @@ export class ZaloNotificationListener {
     const hours =
       this.configService.getOrThrow<ZaloConfig>('zalo').deadlineReminderHours;
     const dueTasks = await this.tasksService.findApproachingDeadline(hours);
+    const { frontendUrl } =
+      this.configService.getOrThrow<GoogleOAuthConfig>('googleOAuth');
+    const tasksUrl = frontendUrl
+      ? new URL('/tasks', frontendUrl).toString()
+      : undefined;
 
     for (const task of dueTasks) {
       try {
@@ -131,7 +142,7 @@ export class ZaloNotificationListener {
           );
           await this.zaloBotService.sendTextMessage(
             account.zaloUserId,
-            formatDeadlineMessage(task, timeZone),
+            formatDeadlineMessage(task, timeZone, tasksUrl),
           );
         }
       } catch (error) {
