@@ -14,6 +14,14 @@ export class ZaloAccountRepository {
     return this.prisma.zaloAccount.findUnique({ where: { zaloUserId } });
   }
 
+  findAll(): Promise<ZaloAccount[]> {
+    return this.prisma.zaloAccount.findMany();
+  }
+
+  count(): Promise<number> {
+    return this.prisma.zaloAccount.count();
+  }
+
   upsert(userId: string, zaloUserId: string): Promise<ZaloAccount> {
     return this.prisma.zaloAccount.upsert({
       where: { userId },
