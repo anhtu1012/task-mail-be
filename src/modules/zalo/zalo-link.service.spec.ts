@@ -12,6 +12,7 @@ describe('ZaloLinkService', () => {
     } as unknown as ZaloLinkCodeRepository;
     const zaloAccountRepository = {
       upsert: jest.fn().mockResolvedValue(undefined),
+      findByZaloUserId: jest.fn().mockResolvedValue(null),
     } as unknown as ZaloAccountRepository;
     const service = new ZaloLinkService(
       zaloLinkCodeRepository,
@@ -43,7 +44,7 @@ describe('ZaloLinkService', () => {
 
     const result = await service.confirmLink('123456', 'zalo-user-1');
 
-    expect(result).toBe(true);
+    expect(result).toBe('linked');
     expect(zaloAccountRepository.upsert).toHaveBeenCalledWith(
       'user-1',
       'zalo-user-1',
@@ -57,7 +58,7 @@ describe('ZaloLinkService', () => {
 
     const result = await service.confirmLink('000000', 'zalo-user-1');
 
-    expect(result).toBe(false);
+    expect(result).toBe('invalid_code');
     expect(zaloAccountRepository.upsert).not.toHaveBeenCalled();
   });
 
@@ -72,7 +73,49 @@ describe('ZaloLinkService', () => {
 
     const result = await service.confirmLink('123456', 'zalo-user-1');
 
-    expect(result).toBe(false);
+    expect(result).toBe('invalid_code');
     expect(zaloAccountRepository.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Zalo chat already linked to a different account', async () => {
+    const { service, zaloLinkCodeRepository, zaloAccountRepository } = build();
+    (zaloLinkCodeRepository.findByCode as jest.Mock).mockResolvedValue({
+      id: 'code-1',
+      userId: 'user-1',
+      code: '123456',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    (zaloAccountRepository.findByZaloUserId as jest.Mock).mockResolvedValue({
+      userId: 'user-2',
+      zaloUserId: 'zalo-user-1',
+    });
+
+    const result = await service.confirmLink('123456', 'zalo-user-1');
+
+    expect(result).toBe('already_linked');
+    expect(zaloAccountRepository.upsert).not.toHaveBeenCalled();
+    expect(zaloLinkCodeRepository.delete).not.toHaveBeenCalled();
+  });
+
+  it('re-links the same user to a new Zalo chat without conflict', async () => {
+    const { service, zaloLinkCodeRepository, zaloAccountRepository } = build();
+    (zaloLinkCodeRepository.findByCode as jest.Mock).mockResolvedValue({
+      id: 'code-1',
+      userId: 'user-1',
+      code: '123456',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    (zaloAccountRepository.findByZaloUserId as jest.Mock).mockResolvedValue({
+      userId: 'user-1',
+      zaloUserId: 'zalo-user-1',
+    });
+
+    const result = await service.confirmLink('123456', 'zalo-user-1');
+
+    expect(result).toBe('linked');
+    expect(zaloAccountRepository.upsert).toHaveBeenCalledWith(
+      'user-1',
+      'zalo-user-1',
+    );
   });
 });

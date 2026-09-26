@@ -10,6 +10,10 @@ export class ZaloAccountRepository {
     return this.prisma.zaloAccount.findUnique({ where: { userId } });
   }
 
+  findByZaloUserId(zaloUserId: string): Promise<ZaloAccount | null> {
+    return this.prisma.zaloAccount.findUnique({ where: { zaloUserId } });
+  }
+
   upsert(userId: string, zaloUserId: string): Promise<ZaloAccount> {
     return this.prisma.zaloAccount.upsert({
       where: { userId },
