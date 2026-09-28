@@ -32,10 +32,16 @@ const POOL_OPTIONS = {
   min: 1,
   /**
    * Supabase session-mode pooler chỉ có 15 client cho cả dự án, và trong lúc
-   * rolling deploy container cũ + mới cùng giữ kết nối. Giữ nhỏ để hai container
-   * cộng lại vẫn còn dư chỗ cho `prisma migrate deploy`.
+   * rolling deploy container cũ + mới cùng giữ kết nối. Công thức an toàn:
+   * `max × 2 container + 1 (migrate deploy) ≤ 15` → max ≤ 7.
+   *
+   * Từng đặt `4` sau lần vá `EMAXCONNSESSION`, nhưng quá bảo thủ: một request
+   * `getFull` một mình đã cần 5 connection song song (`board.service.ts`), nên
+   * dashboard bắn ~12 request cùng lúc bị xếp hàng chờ pool, mọi endpoint chậm
+   * đồng loạt (0.7–1.9s cho truy vấn lẽ ra chỉ vài chục ms). `6` để lại 2 slot
+   * dư (2×6+1=13) mà vẫn đủ thông lượng lúc nhiều request chạy song song.
    */
-  max: 4,
+  max: 6,
   /** TCP keep-alive: giữ đường truyền sống qua NAT/idle timeout của hạ tầng. */
   keepAlive: true,
 };
