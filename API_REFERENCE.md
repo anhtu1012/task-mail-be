@@ -15,7 +15,7 @@ Tài liệu này mô tả toàn bộ API backend để dựng frontend. Được
 
 ### Rate limit
 
-- Mặc định **20 request / 60 giây** (chỉnh qua env `RATE_LIMIT_LIMIT` / `RATE_LIMIT_TTL_MS`), tính **theo từng route handler + IP** (không phải một hạn mức chung cho mọi route). Lưu in-memory, mỗi instance một bộ đếm.
+- Mặc định **20 request / 60 giây** (chỉnh qua env `RATE_LIMIT_LIMIT` / `RATE_LIMIT_TTL_MS`), tính **theo từng route handler + người dùng** (route Public như đăng nhập/đăng ký thì theo IP thật — backend bật `trust proxy`, số tầng qua env `TRUST_PROXY_HOPS`, mặc định 1). Lưu in-memory, mỗi instance một bộ đếm.
 - Nâng lên **120 / 60 giây** cho các route ghi tần suất cao của board: `PATCH /lists/:id/move`, `POST /lists/:id/cards`, `PATCH /tasks/:id/move`, `PATCH /tasks/:id/snooze`, `POST /tasks/inbox/cards`, `POST /checklists/:id/items`, `PATCH /checklist-items/:id`.
 - `/me/preferences/*`: **60 / 60 giây**.
 - Vượt quá → `429`, `errorCode: "TOO_MANY_REQUESTS"`, `message: "ThrottlerException: Too Many Requests"`.
