@@ -1,0 +1,2 @@
+# Script shell chạy trong container/CI Linux — CRLF làm `sh` gãy ở dòng đầu.
+*.sh text eol=lf
