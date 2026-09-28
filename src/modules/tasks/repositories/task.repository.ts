@@ -237,16 +237,41 @@ export class TaskRepository {
     ).length;
   }
 
-  findApproachingDeadline(hours: number): Promise<Task[]> {
+  /**
+   * Việc đang mở có hạn trong `(now, now + withinMinutes]` mà người được giao
+   * đã liên kết Zalo. Chưa liên kết thì không lấy — không có kênh để gửi, và
+   * không được đánh dấu "đã nhắc" thay cho họ (xem listener).
+   *
+   * Việc nào đã nhắc ở mốc nào thì cron tự lọc bằng `deadlineRemindedOffset`
+   * sau khi biết cài đặt của từng người; lọc ở SQL phải join cài đặt, không đáng.
+   */
+  findReminderCandidates(withinMinutes: number): Promise<Task[]> {
     const now = new Date();
-    const threshold = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    const until = new Date(now.getTime() + withinMinutes * 60_000);
     return this.prisma.task.findMany({
       where: {
         deletedAt: null,
-        deadline: { gte: now, lte: threshold },
+        deadline: { gt: now, lte: until },
         status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] },
-        deadlineNotifiedAt: null,
+        assignee: { zaloAccount: { isNot: null } },
       },
+      orderBy: { deadline: 'asc' },
+    });
+  }
+
+  /** Việc đang mở của một người có hạn trước `before` — dùng cho tóm tắt hằng ngày. */
+  findOpenWithDeadlineBefore(
+    assigneeId: string,
+    before: Date,
+  ): Promise<Task[]> {
+    return this.prisma.task.findMany({
+      where: {
+        assigneeId,
+        deletedAt: null,
+        deadline: { lt: before },
+        status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] },
+      },
+      orderBy: { deadline: 'asc' },
     });
   }
 
@@ -254,14 +279,18 @@ export class TaskRepository {
   clearDeadlineNotified(id: string): Promise<Task> {
     return this.prisma.task.update({
       where: { id },
-      data: { deadlineNotifiedAt: null },
+      data: { deadlineNotifiedAt: null, deadlineRemindedOffset: null },
     });
   }
 
-  markDeadlineNotified(id: string): Promise<Task> {
+  /** Ghi nhận đã nhắc ở mốc `offsetMinutes` (và mọi mốc lớn hơn nó). */
+  markReminded(id: string, offsetMinutes: number): Promise<Task> {
     return this.prisma.task.update({
       where: { id },
-      data: { deadlineNotifiedAt: new Date() },
+      data: {
+        deadlineNotifiedAt: new Date(),
+        deadlineRemindedOffset: offsetMinutes,
+      },
     });
   }
 }

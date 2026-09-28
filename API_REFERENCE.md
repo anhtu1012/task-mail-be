@@ -478,6 +478,28 @@ Ràng buộc: `background` 1–40 ký tự `^[a-z0-9-]+$`; `accent` `^#[0-9a-fA-
 
 **Mọi** lỗi `400` trên controller này (sai ràng buộc, thiếu field, field thừa, sai kiểu) được đổi thành **`422` `VALIDATION_FAILED`** (không phải `400` như phần còn lại của API — hợp đồng riêng với FE, xem `Validation422Filter`).
 
+### 6b.1 Cài đặt thông báo Zalo (`/me/preferences/notifications`)
+
+Cùng hợp đồng với theme: GET **luôn `200`**, lỗi body là **`422 VALIDATION_FAILED`**, trần 60 req/phút.
+
+```ts
+interface NotificationPreference {
+  newTaskEnabled: boolean;      // nhắn khi được giao việc mới
+  reminderOffsets: number[];    // mốc nhắc trước hạn (PHÚT), tăng dần; [] = tắt nhắc hạn
+  digestEnabled: boolean;       // tóm tắt hằng ngày
+  digestTime: string;           // "HH:mm" giờ địa phương, phút là bội số của 5
+  source: 'user' | 'default';   // 'default' = chưa từng lưu
+  updatedAt: string | null;
+}
+```
+
+- `GET /me/preferences/notifications` → `200 NotificationPreference`. Chưa lưu: `{ newTaskEnabled: true, reminderOffsets: [TASK_DEADLINE_REMINDER_HOURS*60] /* [1440] */, digestEnabled: false, digestTime: "08:00", source: "default", updatedAt: null }`.
+- `PUT /me/preferences/notifications` — body gửi **đủ 4 trường** `newTaskEnabled`, `reminderOffsets`, `digestEnabled`, `digestTime` → `200`, `source: "user"`. Server tự sắp `reminderOffsets` tăng dần.
+
+Ràng buộc: `reminderOffsets` tối đa **3** giá trị, không trùng, mỗi giá trị thuộc `15, 30, 60, 120, 180, 360, 720, 1440, 2880`; `digestTime` khớp `^([01]\d|2[0-3]):[0-5][05]$`.
+
+Cài đặt chỉ có tác dụng khi đã liên kết Zalo (mục 6); lưu trước khi liên kết vẫn được.
+
 ## 6c. Module `board` — bảng Kanban (cột, thẻ, nhãn, checklist, ghi chú, đính kèm)
 
 Tất cả yêu cầu Bearer. **Không có ngoại lệ cho admin**: mỗi bảng thuộc 1 người trong 1 dự án (`@@unique([ownerId, projectId])`). Thẻ chỉ thao tác được bởi **người được giao** (admin và người tạo cũng không). Tài nguyên của người khác/không tồn tại → **`404` với mã của tài nguyên đó** (`CARD_NOT_FOUND`, `LIST_NOT_FOUND`…), không bao giờ `403`.
@@ -647,11 +669,16 @@ Tất cả yêu cầu Bearer + role `ADMIN`/`SUPER_ADMIN` (khác → `403 ERROR`
   - Gửi **đồng bộ, tuần tự**, cách nhau 150ms, không lưu lịch sử → nhiều người nhận thì request lâu; FE nên hiện loading và tăng timeout.
 
 **Hành vi nền liên quan (không phải endpoint, chỉ để FE hiểu luồng)**:
-- **Task mới**: gửi Zalo cho người được giao (kể cả khi tự giao cho mình) khi task được tạo qua `POST /tasks` hoặc từ email. **Không** gửi với thẻ tạo từ board (`POST /tasks/inbox/cards`, `POST /lists/:id/cards`). Nội dung: tiêu đề, độ ưu tiên, deadline (theo múi giờ người nhận), mô tả dạng text ≤1000 ký tự, link `${FRONTEND_URL}/tasks`.
-- **Nhắc deadline**: mỗi giờ (phút 0), quét task chưa `DONE`/`CANCELLED`, chưa nhắc, có `deadline` trong `[now, now + TASK_DEADLINE_REMINDER_HOURS]` (mặc định 24 giờ). Task đã quá hạn không bao giờ được nhắc.
-  - Mỗi task chỉ nhắc 1 lần. Người được giao **chưa liên kết Zalo** thì task không bị đánh dấu → liên kết muộn (khi hạn vẫn còn trong cửa sổ) vẫn nhận được nhắc ở lần quét kế tiếp. Gửi lỗi thì vẫn đánh dấu (không retry).
-  - Cờ được reset khi đổi hạn: `PATCH /tasks/:id/snooze` hoặc `PATCH /tasks/:id` có `deadline` mới.
-- Env liên quan: `ZALO_BOT_TOKEN`, `ZALO_BOT_PROFILE_URL`, `TASK_DEADLINE_REMINDER_HOURS`, `FRONTEND_URL`.
+Cả ba loại tin dưới đây đều theo cài đặt riêng của người nhận — `/me/preferences/notifications` (mục 6b.1).
+
+- **Task mới**: gửi Zalo cho người được giao (kể cả khi tự giao cho mình) khi task được tạo qua `POST /tasks` hoặc từ email, **trừ khi** họ tắt `newTaskEnabled`. **Không** gửi với thẻ tạo từ board (`POST /tasks/inbox/cards`, `POST /lists/:id/cards`). Nội dung: tiêu đề, độ ưu tiên, deadline (theo múi giờ người nhận), mô tả dạng text ≤1000 ký tự, link `${FRONTEND_URL}/tasks`.
+- **Nhắc deadline**: **mỗi 5 phút**, quét task chưa `DONE`/`CANCELLED` có `deadline` trong 2 ngày tới, của người đã liên kết Zalo. Task đã quá hạn không bao giờ được nhắc.
+  - Gửi theo **mốc của người nhận** (`reminderOffsets`, vd `[1440, 60]` = trước 1 ngày và trước 1 giờ). Mỗi mốc bắn đúng một lần. Việc tạo sát hạn chỉ nhận mốc nhỏ nhất đã tới, không dồn nhiều tin. Tin có dòng "còn X nữa".
+  - Người chưa từng lưu cài đặt: một mốc duy nhất = `TASK_DEADLINE_REMINDER_HOURS` (mặc định 24 giờ) — đúng hành vi cũ.
+  - Người được giao **chưa liên kết Zalo** thì task không bị đánh dấu → liên kết muộn vẫn được nhắc ở lượt sau. Gửi lỗi thì vẫn đánh dấu (không retry).
+  - Đổi hạn (`PATCH /tasks/:id/snooze` hoặc `PATCH /tasks/:id` có `deadline` mới) reset trạng thái → mọi mốc được nhắc lại cho hạn mới.
+- **Tóm tắt hằng ngày** (nếu bật `digestEnabled`): một tin mỗi ngày, trong vòng 60 phút kể từ `digestTime` theo múi giờ người nhận, liệt kê việc **quá hạn** và việc **đến hạn hôm nay** (mọi dự án, tối đa 10 việc mỗi nhóm). Không có gì để báo thì không nhắn. Đổi giờ sang một giờ đã qua quá 60 phút thì hôm đó không gửi.
+- Env liên quan: `ZALO_BOT_TOKEN`, `ZALO_BOT_PROFILE_URL`, `TASK_DEADLINE_REMINDER_HOURS` (mặc định cho người chưa lưu cài đặt), `FRONTEND_URL`.
 - Zalo là kênh thông báo duy nhất (tự động + broadcast thủ công của admin) — FE **không** cần/có thể tự implement push notification, không có SSE/WebSocket.
 
 ---
