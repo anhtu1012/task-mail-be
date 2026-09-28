@@ -18,6 +18,8 @@ import {
   type ProjectStatsRow,
 } from '../repositories/project.repository';
 import { generateProjectCode } from '../project-code.util';
+import { CacheService } from '../../../infrastructure/cache/cache.service';
+import { CACHE_TTL, CacheKeys } from '../../../infrastructure/cache/cache-keys';
 import { ProjectAccessService } from './project-access.service';
 import {
   DEFAULT_PROJECT_COLOR,
@@ -44,11 +46,26 @@ export class ProjectsService {
   constructor(
     private readonly repository: ProjectRepository,
     private readonly access: ProjectAccessService,
+    private readonly cache: CacheService,
   ) {}
 
-  async list(
+  /**
+   * Ba truy vấn đếm `groupBy` chạy trên bảng `tasks` ở mỗi lần gọi, mà màn hình
+   * nào cũng gọi — nên cả kết quả được cache. Thống kê trễ tối đa
+   * `CACHE_TTL.PROJECTS`; đổi chính dự án thì xoá ngay (ProjectRepository).
+   */
+  list(userId: string, query: ListProjectsQueryDto): Promise<ProjectListDto> {
+    const includeArchived = query.includeArchived === true;
+    return this.cache.wrap(
+      CacheKeys.projectList(userId, includeArchived),
+      CACHE_TTL.PROJECTS,
+      () => this.loadList(userId, includeArchived),
+    );
+  }
+
+  private async loadList(
     userId: string,
-    query: ListProjectsQueryDto,
+    includeArchived: boolean,
   ): Promise<ProjectListDto> {
     // Lưới an toàn cho tài khoản đăng nhập bằng Google và tài khoản có trước
     // migration: màn hình chọn dự án không bao giờ được rỗng.
@@ -56,7 +73,7 @@ export class ProjectsService {
 
     const projects = await this.repository.findManyByOwner(
       userId,
-      query.includeArchived === true,
+      includeArchived,
     );
     const stats = await this.repository.statsByProject(
       projects.map((project) => project.id),

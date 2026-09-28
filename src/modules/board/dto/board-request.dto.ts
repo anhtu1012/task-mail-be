@@ -418,6 +418,10 @@ export class AgendaQueryDto extends TimezoneQueryDto {
   date?: string;
 }
 
+/** Dữ liệu ngoài bảng mà `/boards/me/full` gộp thêm khi được xin. */
+export const BOARD_FULL_INCLUDES = ['projects', 'taskTypes'] as const;
+export type BoardFullInclude = (typeof BOARD_FULL_INCLUDES)[number];
+
 export class BoardFullQueryDto extends TimezoneQueryDto {
   @ApiPropertyOptional({ default: 20, maximum: MAX_CARDS_PER_LIST })
   @IsOptional()
@@ -426,6 +430,28 @@ export class BoardFullQueryDto extends TimezoneQueryDto {
   @Min(1)
   @Max(MAX_CARDS_PER_LIST)
   cardsPerList?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Gộp thêm dữ liệu khởi tạo màn hình, phân cách bằng dấu phẩy. Chỉ xin ở lần tải đầu — tải lại bảng sau khi kéo thả thì bỏ trống.',
+    example: 'projects,taskTypes',
+    enum: BOARD_FULL_INCLUDES,
+    isArray: true,
+  })
+  @IsOptional()
+  // Đọc `obj` chứ không đọc `value`: `enableImplicitConversion` đã ép giá trị
+  // theo kiểu mảng trước khi tới đây. Nhận cả `?include=a,b` lẫn
+  // `?include=a&include=b`.
+  @Transform(({ obj }: { obj: Record<string, unknown> }) => {
+    const raw = obj?.include;
+    const parts = Array.isArray(raw) ? raw : [raw];
+    return parts
+      .flatMap((part) => (typeof part === 'string' ? part.split(',') : []))
+      .map((part) => part.trim())
+      .filter(Boolean);
+  })
+  @IsIn(BOARD_FULL_INCLUDES, { each: true })
+  include?: BoardFullInclude[];
 }
 
 export class ListCardsQueryDto extends ProjectScopeQueryDto {

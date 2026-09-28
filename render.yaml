@@ -18,7 +18,19 @@ services:
         value: 9999
       - key: APP_URL
         value: https://task-mail-be.onrender.com
+      # Transaction pooler (cổng 6543) — xem .env.example
       - key: DATABASE_URL
+        sync: false
+      # Session pooler (cổng 5432) — chỉ cho `prisma migrate deploy`
+      - key: DIRECT_URL
+        sync: false
+      # Để trống tới khi DATABASE_URL đã sang cổng 6543, rồi đặt 10 và 0.
+      # Đặt sớm hơn thì deploy gãy lại với EMAXCONNSESSION.
+      - key: DATABASE_POOL_MAX
+        sync: false
+      - key: DATABASE_POOL_IDLE_TIMEOUT_MS
+        sync: false
+      - key: REDIS_URL
         sync: false
       - key: JWT_ACCESS_SECRET
         sync: false

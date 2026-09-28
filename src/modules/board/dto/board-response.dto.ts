@@ -3,6 +3,8 @@ import { TaskCategory } from '../../../common/enums/task-category.enum';
 import { TaskPriority } from '../../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../../common/enums/task-status.enum';
 import type { DeadlineStatus } from '../../../common/utils/deadline.util';
+import { ProjectListDto } from '../../projects/dto/project-response.dto';
+import { TaskTypeResponseDto } from '../../tasks/dto/task-type-response.dto';
 
 export type CardSource = 'EMAIL' | 'ZALO' | 'MANUAL';
 
@@ -116,6 +118,18 @@ export class BoardFullResponseDto {
   })
   cardCounts: Record<string, number>;
   @ApiProperty({ type: TodayMetricsDto }) today: TodayMetricsDto;
+  @ApiPropertyOptional({
+    type: ProjectListDto,
+    description:
+      'Chỉ có khi `include` chứa `projects`. Giống hệt `GET /projects?includeArchived=false`; thống kê trễ tối đa 30 giây.',
+  })
+  projects?: ProjectListDto;
+  @ApiPropertyOptional({
+    type: [TaskTypeResponseDto],
+    description:
+      'Chỉ có khi `include` chứa `taskTypes`. Giống hệt `GET /task-types`.',
+  })
+  taskTypes?: TaskTypeResponseDto[];
 }
 
 export class CardPageDto {
