@@ -1,5 +1,6 @@
 import appConfig from './app.config';
 import authConfig from './auth.config';
+import cacheConfig from './cache.config';
 import cookieConfig from './cookie.config';
 import databaseConfig from './database.config';
 import googleConfig from './google.config';
@@ -10,6 +11,7 @@ import zaloConfig from './zalo.config';
 
 export * from './app.config';
 export * from './auth.config';
+export * from './cache.config';
 export * from './cookie.config';
 export * from './database.config';
 export * from './google.config';
@@ -22,6 +24,7 @@ export * from './zalo.config';
 export const configModules = [
   appConfig,
   authConfig,
+  cacheConfig,
   cookieConfig,
   databaseConfig,
   googleConfig,

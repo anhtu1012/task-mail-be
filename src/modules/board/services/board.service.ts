@@ -8,7 +8,12 @@ import { BusinessException } from '../../../common/exceptions/business.exception
 import { NotFoundException } from '../../../common/exceptions/not-found.exception';
 import { StringUtil } from '../../../common/utils/string.util';
 import { TimezoneUtil } from '../../../common/utils/timezone.util';
+import { CacheService } from '../../../infrastructure/cache/cache.service';
+import { CACHE_TTL, CacheKeys } from '../../../infrastructure/cache/cache-keys';
+import { ProjectsService } from '../../projects/services/projects.service';
+import { TaskTypesService } from '../../tasks/task-types.service';
 import {
+  BoardFullInclude,
   BoardFullQueryDto,
   CreateLabelDto,
   TimezoneQueryDto,
@@ -36,6 +41,9 @@ export class BoardService {
     private readonly boardRepository: BoardRepository,
     private readonly cardRepository: BoardCardRepository,
     private readonly access: BoardAccessService,
+    private readonly cache: CacheService,
+    private readonly projectsService: ProjectsService,
+    private readonly taskTypesService: TaskTypesService,
   ) {}
 
   /**
@@ -48,12 +56,17 @@ export class BoardService {
     userId: string,
     query: BoardFullQueryDto,
   ): Promise<BoardFullResponseDto> {
-    // Múi giờ chỉ cần `userId` nên không phải chờ bảng — chạy song song để bớt
-    // một vòng mạng. Sau lần đầu nó còn được phục vụ từ cache trong bộ nhớ.
-    const [{ board, projectId, created }, timeZone] = await Promise.all([
-      this.access.resolveBoardForRead(userId, query.projectId),
-      this.access.resolveTimezone(userId, query.tz),
-    ]);
+    // Múi giờ và phần gộp thêm (`include`) chỉ cần `userId` nên không phải chờ
+    // bảng — chạy song song để bớt vòng mạng. Gộp chung một `Promise.all` chứ
+    // không để phần gộp chạy riêng rồi `await` sau: nó mà lỗi trong lúc đang
+    // chờ bước khác thì thành unhandled rejection và làm sập tiến trình.
+    const [{ board, projectId, created }, timeZone, extras] = await Promise.all(
+      [
+        this.access.resolveBoardForRead(userId, query.projectId),
+        this.access.resolveTimezone(userId, query.tz),
+        this.loadIncludes(userId, query.include ?? []),
+      ],
+    );
 
     // Task nhận từ mail trước khi bảng tồn tại có `boardId` null; gom chúng vào
     // đây là thứ đưa chúng vào Hộp thư đến.
@@ -73,7 +86,7 @@ export class BoardService {
 
     const [lists, labels, cards, cardCounts, today] = await Promise.all([
       this.boardRepository.findLists(board.id),
-      this.boardRepository.findLabels(board.id),
+      this.labelsOf(board.id),
       this.cardRepository.topCardsPerList(board.id, cardsPerList),
       this.cardRepository.countCardsPerList(board.id),
       this.computeToday(board.id, timeZone),
@@ -82,11 +95,44 @@ export class BoardService {
     return {
       board: toBoardDto(board),
       lists: lists.map(toListDto),
-      labels: labels.map(toLabelDto),
+      labels,
       cards: cards.map(toCardSummary),
       cardCounts,
       today,
+      ...extras,
     };
+  }
+
+  /**
+   * Dữ liệu mà mọi màn hình cần lúc mở app, gộp vào đây để frontend khỏi bắn
+   * thêm `GET /projects` và `GET /task-types` song song — mỗi request thêm là
+   * thêm một lượt giành kết nối DB. Cả hai đều đọc qua cache.
+   */
+  private async loadIncludes(
+    userId: string,
+    include: BoardFullInclude[],
+  ): Promise<Pick<BoardFullResponseDto, 'projects' | 'taskTypes'>> {
+    const [projects, taskTypes] = await Promise.all([
+      include.includes('projects')
+        ? this.projectsService.list(userId, { includeArchived: false })
+        : undefined,
+      include.includes('taskTypes')
+        ? this.taskTypesService.findAll()
+        : undefined,
+    ]);
+    return {
+      ...(projects && { projects }),
+      ...(taskTypes && { taskTypes }),
+    };
+  }
+
+  private labelsOf(boardId: string): Promise<BoardLabelDto[]> {
+    return this.cache.wrap(
+      CacheKeys.boardLabels(boardId),
+      CACHE_TTL.LABELS,
+      async () =>
+        (await this.boardRepository.findLabels(boardId)).map(toLabelDto),
+    );
   }
 
   async getToday(
@@ -142,8 +188,7 @@ export class BoardService {
     projectId?: string,
   ): Promise<BoardLabelDto[]> {
     const { board } = await this.access.resolveBoardForRead(userId, projectId);
-    const labels = await this.boardRepository.findLabels(board.id);
-    return labels.map(toLabelDto);
+    return this.labelsOf(board.id);
   }
 
   async createLabel(

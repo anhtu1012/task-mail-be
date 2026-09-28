@@ -6,13 +6,22 @@ import {
   UpdateTaskTypeDto,
 } from './dto/task-type-request.dto';
 import { NotFoundException } from '../../common/exceptions/not-found.exception';
+import { CacheService } from '../../infrastructure/cache/cache.service';
+import { CACHE_TTL, CacheKeys } from '../../infrastructure/cache/cache-keys';
+import { TaskTypeResponseDto } from './dto/task-type-response.dto';
 
 @Injectable()
 export class TaskTypesService {
-  constructor(private readonly taskTypeRepository: TaskTypeRepository) {}
+  constructor(
+    private readonly taskTypeRepository: TaskTypeRepository,
+    private readonly cache: CacheService,
+  ) {}
 
-  findAll(): Promise<TaskType[]> {
-    return this.taskTypeRepository.findAll();
+  /** Danh mục dùng chung cho mọi người, chỉ admin sửa — đọc gần như luôn trúng cache. */
+  findAll(): Promise<TaskTypeResponseDto[]> {
+    return this.cache.wrap(CacheKeys.taskTypes(), CACHE_TTL.TASK_TYPES, () =>
+      this.taskTypeRepository.findAll(),
+    );
   }
 
   async findById(id: string): Promise<TaskType> {

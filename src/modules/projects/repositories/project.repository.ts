@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { CacheService } from '../../../infrastructure/cache/cache.service';
+import { CacheKeys } from '../../../infrastructure/cache/cache-keys';
 import type { Project } from '../../../generated/prisma/client';
 import { TaskStatus } from '../../../generated/prisma/enums';
 
@@ -31,9 +33,21 @@ export type ProjectStatsRow = {
 
 const CLOSED_STATUSES = [TaskStatus.DONE, TaskStatus.CANCELLED];
 
+/**
+ * Mọi lệnh ghi `projects` đều xoá cache danh sách dự án của chủ sở hữu ngay tại
+ * đây — kể cả các đường tự lành trong `ProjectAccessService` (dời cờ mặc định,
+ * dựng lại "Công việc chung"), vốn không đi qua `ProjectsService`.
+ */
 @Injectable()
 export class ProjectRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
+
+  private invalidateLists(ownerId: string): Promise<void> {
+    return this.cache.invalidate(...CacheKeys.projectLists(ownerId));
+  }
 
   /**
    * Không `orderBy` ở đây: thứ tự (mặc định lên đầu, còn lại theo tên tiếng
@@ -92,16 +106,21 @@ export class ProjectRepository {
     return new Set(rows.map((row) => row.code));
   }
 
-  create(input: CreateProjectInput): Promise<Project> {
-    return this.prisma.project.create({ data: input });
+  async create(input: CreateProjectInput): Promise<Project> {
+    const project = await this.prisma.project.create({ data: input });
+    await this.invalidateLists(project.ownerId);
+    return project;
   }
 
-  update(id: string, data: UpdateProjectInput): Promise<Project> {
-    return this.prisma.project.update({ where: { id }, data });
+  async update(id: string, data: UpdateProjectInput): Promise<Project> {
+    const project = await this.prisma.project.update({ where: { id }, data });
+    await this.invalidateLists(project.ownerId);
+    return project;
   }
 
   async deleteById(id: string): Promise<void> {
-    await this.prisma.project.delete({ where: { id } });
+    const project = await this.prisma.project.delete({ where: { id } });
+    await this.invalidateLists(project.ownerId);
   }
 
   /**
@@ -132,6 +151,7 @@ export class ProjectRepository {
         data: { isDefault: true },
       }),
     ]);
+    await this.invalidateLists(ownerId);
     return project;
   }
 
@@ -140,6 +160,7 @@ export class ProjectRepository {
       where: { ownerId, isDefault: true },
       data: { isDefault: false },
     });
+    await this.invalidateLists(ownerId);
   }
 
   /**

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { CacheService } from '../../../infrastructure/cache/cache.service';
+import { CacheKeys } from '../../../infrastructure/cache/cache-keys';
 import type {
   Board,
   BoardLabel,
@@ -25,7 +27,10 @@ export type UpdateListInput = {
 
 @Injectable()
 export class BoardRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
 
   /**
    * Bảng của một người **trong một dự án**. Không còn hàm tra theo riêng
@@ -226,17 +231,24 @@ export class BoardRepository {
     });
   }
 
-  createLabel(input: {
+  // Ba lệnh ghi nhãn dưới đây là đường ghi DUY NHẤT vào `board_labels`, nên
+  // xoá cache đặt ở đây thay vì ở service: thêm một đường ghi mới ở service
+  // không thể quên xoá cache. (Xoá bảng theo cascade chỉ để lại khoá mồ côi của
+  // một bảng không còn ai đọc.)
+
+  async createLabel(input: {
     boardId: string;
     name: string;
     color: string;
     icon?: string | null;
     slug: string;
   }): Promise<BoardLabel> {
-    return this.prisma.boardLabel.create({ data: input });
+    const label = await this.prisma.boardLabel.create({ data: input });
+    await this.cache.invalidate(CacheKeys.boardLabels(label.boardId));
+    return label;
   }
 
-  updateLabel(
+  async updateLabel(
     id: string,
     data: {
       name?: string;
@@ -245,10 +257,13 @@ export class BoardRepository {
       slug?: string;
     },
   ): Promise<BoardLabel> {
-    return this.prisma.boardLabel.update({ where: { id }, data });
+    const label = await this.prisma.boardLabel.update({ where: { id }, data });
+    await this.cache.invalidate(CacheKeys.boardLabels(label.boardId));
+    return label;
   }
 
   async deleteLabel(id: string): Promise<void> {
-    await this.prisma.boardLabel.delete({ where: { id } });
+    const label = await this.prisma.boardLabel.delete({ where: { id } });
+    await this.cache.invalidate(CacheKeys.boardLabels(label.boardId));
   }
 }

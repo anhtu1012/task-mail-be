@@ -305,6 +305,8 @@ thuộc đúng một dự án và không nhìn thấy được từ dự án kh�
   Sắp xếp: dự án mặc định lên đầu, còn lại theo `name` **collation tiếng Việt**
   (sắp ở tầng ứng dụng bằng `Intl.Collator('vi')` — Postgres của Supabase chạy
   `en_US.utf8`, xếp "Đà Nẵng" sau "Zulu").
+  **Có cache**: `stats` có thể trễ tối đa **30 giây** sau khi tạo/sửa việc; đổi
+  chính dự án (tên, màu, mặc định, lưu trữ…) thì thấy ngay.
 - `GET /projects/:id` → `200` một `ProjectDto`.
 - `POST /projects` — chỉ `name` bắt buộc. Bỏ trống `code` thì backend sinh từ
   `name` (bỏ dấu, chữ cái đầu mỗi từ, HOA, ≤4 ký tự; trùng thì thêm số). Gửi
@@ -346,6 +348,10 @@ Mã lỗi: `PROJECT_NOT_FOUND` (404), `PROJECT_CODE_TAKEN`, `PROJECT_NAME_TAKEN`
 - `/boards/me/full`, `/agenda`, `/search`, `/today`, `/labels`,
   `/boards/me/inbox/cards`, `/boards/me/inbox/rebalance` nhận `?projectId=`;
   bỏ trống = dự án mặc định. `/full` tự tạo bảng cho dự án chưa có.
+- `GET /boards/me/full?include=projects,taskTypes` gộp thêm `projects`
+  (= `GET /projects?includeArchived=false`) và `taskTypes` (= `GET /task-types`)
+  vào response. Bỏ trống `include` thì response giữ nguyên như cũ. Giá trị lạ →
+  `400`. Chi tiết cách FE chuyển sang: `docs/fe-bootstrap-endpoint.md`.
 - `POST /tasks/inbox/cards` nhận `projectId` trong body.
   `POST /lists/:id/cards` **không** đổi — dự án suy từ bảng chứa cột.
 - Các endpoint thao tác theo id (`/move`, `/snooze`, `/complete`, checklist,

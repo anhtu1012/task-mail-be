@@ -8,9 +8,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { configModules } from './config';
 import { PrismaModule } from './infrastructure/database/prisma.module';
+import { CacheModule } from './infrastructure/cache/cache.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { TaskTypesModule } from './modules/tasks/task-types.module';
 import { BoardModule } from './modules/board/board.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -28,9 +30,11 @@ import { KeepAliveService } from './common/keep-alive/keep-alive.service';
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
     PrismaModule,
+    CacheModule,
     UsersModule,
     AuthModule,
     TasksModule,
+    TaskTypesModule,
     ProjectsModule,
     BoardModule,
     PreferencesModule,

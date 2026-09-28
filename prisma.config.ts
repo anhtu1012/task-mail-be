@@ -9,6 +9,11 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // CLI (`migrate deploy`) cần một kết nối **session** thật: migration chạy
+    // DDL trong transaction dài và advisory lock mức session, thứ mà
+    // transaction-mode pooler (DATABASE_URL, cổng 6543) không giữ được. App lúc
+    // chạy thì đọc DATABASE_URL trong PrismaService, không qua file này.
+    // `||` chứ không `??`: `DIRECT_URL=` để trống phải rơi về DATABASE_URL.
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });
