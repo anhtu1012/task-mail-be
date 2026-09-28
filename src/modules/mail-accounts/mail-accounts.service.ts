@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { google } from 'googleapis';
@@ -27,6 +27,8 @@ const isPrivileged = (role: Role) =>
 
 @Injectable()
 export class MailAccountsService {
+  private readonly logger = new Logger(MailAccountsService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
@@ -106,7 +108,29 @@ export class MailAccountsService {
         'You do not have access to this mail account',
       );
     }
+    await this.revokeGoogleGrant(account);
     await this.mailAccountRepository.delete(id);
+  }
+
+  /**
+   * Revokes the Gmail grant at Google so disconnecting actually ends access —
+   * the privacy policy promises this, and Google's OAuth review checks it.
+   * Revoking the refresh token also invalidates its access tokens. Best
+   * effort: a token the user already revoked in their Google account returns
+   * an error, which must not block deleting our copy.
+   */
+  private async revokeGoogleGrant(account: MailAccount): Promise<void> {
+    try {
+      const refreshToken = EncryptionUtil.decrypt(
+        account.refreshToken,
+        this.getEncryptionKey(),
+      );
+      await this.buildOAuthClient().revokeToken(refreshToken);
+    } catch (error) {
+      this.logger.warn(
+        `Could not revoke Google grant for mail account ${account.id}: ${(error as Error).message}`,
+      );
+    }
   }
 
   private verifyState(state: string): string {
