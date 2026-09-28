@@ -225,6 +225,10 @@ export class BoardRepository {
     return this.prisma.boardLabel.findUnique({ where: { id } });
   }
 
+  findLabelBySlug(boardId: string, slug: string): Promise<BoardLabel | null> {
+    return this.prisma.boardLabel.findFirst({ where: { boardId, slug } });
+  }
+
   countLabelsInBoard(boardId: string, ids: string[]): Promise<number> {
     return this.prisma.boardLabel.count({
       where: { boardId, id: { in: ids } },

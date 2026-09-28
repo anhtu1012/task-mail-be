@@ -14,6 +14,10 @@ export const ERROR_CODES = {
   LIST_NOT_FOUND: 'LIST_NOT_FOUND',
   CARD_NOT_FOUND: 'CARD_NOT_FOUND',
   LABEL_NOT_FOUND: 'LABEL_NOT_FOUND',
+  /** Tên nhãn không còn chữ/số nào sau khi bỏ dấu — không sinh được slug. */
+  LABEL_NAME_INVALID: 'LABEL_NAME_INVALID',
+  /** Trùng slug với nhãn khác trong cùng bảng ("Báo giá" và "bao gia"). */
+  LABEL_NAME_TAKEN: 'LABEL_NAME_TAKEN',
   CHECKLIST_NOT_FOUND: 'CHECKLIST_NOT_FOUND',
   CHECKLIST_ITEM_NOT_FOUND: 'CHECKLIST_ITEM_NOT_FOUND',
   NOTE_NOT_FOUND: 'NOTE_NOT_FOUND',
@@ -25,6 +29,12 @@ export const ERROR_CODES = {
 
   /** Body sai ràng buộc trên controller gắn `Validation422Filter`. */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
+
+  /** Vượt rate limit (429). */
+  TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
+
+  TASK_TYPE_NOT_FOUND: 'TASK_TYPE_NOT_FOUND',
+  TASK_TYPE_NAME_TAKEN: 'TASK_TYPE_NAME_TAKEN',
 
   // Dự án. Giống bảng: dự án của người khác báo "không tìm thấy" chứ không
   // "không có quyền", để API không xác nhận id đó có tồn tại.

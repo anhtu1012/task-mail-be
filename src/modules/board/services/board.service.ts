@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   DEFAULT_CARDS_PER_LIST,
   MAX_CARDS_PER_LIST,
@@ -202,7 +202,7 @@ export class BoardService {
       name: dto.name,
       color: dto.color,
       icon: dto.icon ?? null,
-      slug: this.uniqueSlug(dto.name),
+      slug: await this.uniqueSlug(boardId, dto.name),
     });
     return toLabelDto(label);
   }
@@ -219,7 +219,9 @@ export class BoardService {
       // `undefined` = không đụng tới, `null` = gỡ icon. Hai thứ khác nhau nên
       // không được gộp bằng `?? null`.
       icon: dto.icon,
-      slug: dto.name ? this.uniqueSlug(dto.name) : undefined,
+      slug: dto.name
+        ? await this.uniqueSlug(label.boardId, dto.name, label.id)
+        : undefined,
     });
     return toLabelDto(updated);
   }
@@ -260,12 +262,28 @@ export class BoardService {
     return label;
   }
 
-  private uniqueSlug(name: string): string {
+  /**
+   * Slug là `@@unique([boardId, slug])` ở DB — để trùng lọt xuống Prisma thì
+   * P2002 thành 500. `exceptId` là chính nhãn đang đổi tên (giữ slug cũ là hợp lệ).
+   */
+  private async uniqueSlug(
+    boardId: string,
+    name: string,
+    exceptId?: string,
+  ): Promise<string> {
     const slug = StringUtil.toLabelSlug(name);
     if (!slug) {
       throw new BusinessException(
         'Tên nhãn phải có ít nhất một chữ hoặc số',
-        ERROR_CODES.LABEL_NOT_FOUND,
+        ERROR_CODES.LABEL_NAME_INVALID,
+      );
+    }
+    const clash = await this.boardRepository.findLabelBySlug(boardId, slug);
+    if (clash && clash.id !== exceptId) {
+      throw new BusinessException(
+        `Đã có nhãn "${clash.name}" trùng tên`,
+        ERROR_CODES.LABEL_NAME_TAKEN,
+        HttpStatus.CONFLICT,
       );
     }
     return slug;

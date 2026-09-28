@@ -132,19 +132,21 @@ export class ZaloNotificationListener {
       : undefined;
 
     for (const task of dueTasks) {
+      // Chưa liên kết Zalo thì KHÔNG đánh dấu đã nhắc: người dùng liên kết muộn
+      // (vẫn còn trong cửa sổ nhắc) phải nhận được nhắc ở lần quét kế tiếp.
+      const account = await this.zaloAccountRepository.findByUserId(
+        task.assigneeId,
+      );
+      if (!account) continue;
+
       try {
-        const account = await this.zaloAccountRepository.findByUserId(
+        const timeZone = await this.usersService.resolveTimezone(
           task.assigneeId,
         );
-        if (account) {
-          const timeZone = await this.usersService.resolveTimezone(
-            task.assigneeId,
-          );
-          await this.zaloBotService.sendTextMessage(
-            account.zaloUserId,
-            formatDeadlineMessage(task, timeZone, tasksUrl),
-          );
-        }
+        await this.zaloBotService.sendTextMessage(
+          account.zaloUserId,
+          formatDeadlineMessage(task, timeZone, tasksUrl),
+        );
       } catch (error) {
         this.logger.error(
           `Failed to send deadline reminder for task ${task.id}`,

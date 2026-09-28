@@ -1,4 +1,6 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { AppConfig } from './config/app.config';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import { json, urlencoded } from 'express';
@@ -15,8 +17,15 @@ import { setupSwagger } from './config/swagger.config';
 const BODY_LIMIT = '10mb';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
   const configService = app.get(ConfigService);
+
+  app.set(
+    'trust proxy',
+    configService.getOrThrow<AppConfig>('app').trustProxyHops,
+  );
 
   app.use(json({ limit: BODY_LIMIT }));
   app.use(urlencoded({ extended: true, limit: BODY_LIMIT }));

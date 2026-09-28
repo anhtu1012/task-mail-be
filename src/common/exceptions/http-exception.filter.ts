@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { API_ROUTES } from '../constants/api-routes.constants';
+import { ERROR_CODES } from '../constants/error-codes.constants';
 import { GoogleOAuthConfig } from '../../config/google.config';
 
 const GOOGLE_LOGIN_CALLBACK_PATH = `/${API_ROUTES.AUTH.ROOT}/${API_ROUTES.AUTH.GOOGLE_CALLBACK}`;
@@ -58,10 +59,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const body = isHttpException ? exception.getResponse() : null;
-    const { message, errorCode } =
-      typeof body === 'object' && body !== null
-        ? (body as { message?: string | string[]; errorCode?: string })
-        : { message: 'Internal server error', errorCode: 'INTERNAL_ERROR' };
+    const { message, errorCode } = this.resolveBody(status, body);
 
     if (!isHttpException) {
       this.logger.error(exception);
@@ -74,5 +72,30 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Một số HttpException dựng response từ *chuỗi* chứ không phải object — điển
+   * hình là ThrottlerException ('ThrottlerException: Too Many Requests'). Gộp
+   * chúng vào nhánh "không phải HTTP" sẽ biến một 429 thành
+   * `INTERNAL_ERROR / Internal server error`, nên xử lý riêng.
+   */
+  private resolveBody(
+    status: HttpStatus,
+    body: unknown,
+  ): { message?: string | string[]; errorCode?: string } {
+    if (typeof body === 'object' && body !== null) {
+      return body;
+    }
+    if (typeof body === 'string') {
+      return {
+        message: body,
+        errorCode:
+          status === HttpStatus.TOO_MANY_REQUESTS
+            ? ERROR_CODES.TOO_MANY_REQUESTS
+            : undefined,
+      };
+    }
+    return { message: 'Internal server error', errorCode: 'INTERNAL_ERROR' };
   }
 }
