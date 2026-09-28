@@ -301,6 +301,7 @@ export class BoardCardService {
       // A fresh deadline resets the reminder, otherwise the Zalo cron would
       // consider this task already notified forever.
       deadlineNotifiedAt: null,
+      deadlineRemindedOffset: null,
     });
 
     if (!undo) {

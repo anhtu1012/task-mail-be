@@ -122,6 +122,7 @@ async function main(): Promise<void> {
             // A deadline that moves back into the future deserves its reminder
             // again — the one already sent announced the wrong time.
             deadlineNotifiedAt: fix.to > new Date() ? null : undefined,
+            deadlineRemindedOffset: fix.to > new Date() ? null : undefined,
           },
         }),
       ),

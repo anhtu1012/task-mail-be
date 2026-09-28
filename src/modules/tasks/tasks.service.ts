@@ -47,6 +47,11 @@ import { DeadlineStatus, TaskResponseDto } from './dto/task-response.dto';
 import { TaskStatsResponseDto } from './dto/task-stats-response.dto';
 import { TASK_CREATED_EVENT } from './events/task-created.event';
 
+/** Việc cần cân nhắc nhắc hạn, kèm mốc nhỏ nhất đã nhắc cho hạn hiện tại. */
+export type ReminderCandidate = TaskResponseDto & {
+  remindedOffset: number | null;
+};
+
 const isPrivileged = (role: Role) =>
   role === Role.ADMIN || role === Role.SUPER_ADMIN;
 
@@ -337,7 +342,10 @@ export class TasksService {
     }
     // Hạn mới = một lần nhắc Zalo mới, giống `/snooze`. Không reset thì dời
     // hạn sau khi đã được nhắc sẽ không bao giờ được nhắc lại.
-    if (deadlineChanged && task.deadlineNotifiedAt) {
+    if (
+      deadlineChanged &&
+      (task.deadlineNotifiedAt || task.deadlineRemindedOffset !== null)
+    ) {
       await this.taskRepository.clearDeadlineNotified(id);
     }
 
@@ -499,14 +507,32 @@ export class TasksService {
     return this.toResponse(task);
   }
 
-  /** Tasks whose deadline falls within the next `hours` and haven't been reminded yet. */
-  async findApproachingDeadline(hours: number): Promise<TaskResponseDto[]> {
-    const tasks = await this.taskRepository.findApproachingDeadline(hours);
-    return tasks.map((task) => this.toResponse(task));
+  /** Việc sắp đến hạn (trong `withinMinutes`) của người đã liên kết Zalo. */
+  async findReminderCandidates(
+    withinMinutes: number,
+  ): Promise<ReminderCandidate[]> {
+    const tasks =
+      await this.taskRepository.findReminderCandidates(withinMinutes);
+    return tasks.map((task) => ({
+      ...this.toResponse(task),
+      remindedOffset: task.deadlineRemindedOffset,
+    }));
   }
 
-  async markDeadlineNotified(id: string): Promise<void> {
-    await this.taskRepository.markDeadlineNotified(id);
+  async markReminded(id: string, offsetMinutes: number): Promise<void> {
+    await this.taskRepository.markReminded(id, offsetMinutes);
+  }
+
+  /** Việc đang mở của một người có hạn trước `before` (quá hạn + đến hạn hôm nay). */
+  async findOpenWithDeadlineBefore(
+    assigneeId: string,
+    before: Date,
+  ): Promise<TaskResponseDto[]> {
+    const tasks = await this.taskRepository.findOpenWithDeadlineBefore(
+      assigneeId,
+      before,
+    );
+    return tasks.map((task) => this.toResponse(task));
   }
 
   private emitTaskCreated(task: Task): void {

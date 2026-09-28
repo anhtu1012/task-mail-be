@@ -17,6 +17,7 @@ export const API_ROUTES = {
   PREFERENCES: {
     ROOT: 'me/preferences',
     THEME: 'theme',
+    NOTIFICATIONS: 'notifications',
   },
   TASKS: {
     ROOT: 'tasks',

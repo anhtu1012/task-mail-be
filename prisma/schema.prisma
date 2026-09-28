@@ -56,6 +56,7 @@ model User {
   boards            Board[]
   projects          Project[]
   themePreference   UserThemePreference?
+  notificationPreference UserNotificationPreference?
 
   @@index([email])
   @@map("users")
@@ -120,6 +121,29 @@ model UserThemePreference {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_theme_preferences")
+}
+
+/// Người dùng tự chỉnh thông báo Zalo. Chưa có bản ghi = dùng mặc định hệ thống
+/// (xem `DEFAULT_NOTIFICATION_PREFERENCE`), nên không cần backfill.
+model UserNotificationPreference {
+  userId         String  @id @map("user_id")
+  /// Nhắn Zalo khi được giao việc mới.
+  newTaskEnabled Boolean @default(true) @map("new_task_enabled")
+  /// Các mốc nhắc trước hạn, tính bằng PHÚT, tăng dần, không trùng. Rỗng = tắt
+  /// nhắc hạn. Giá trị hợp lệ lấy từ danh sách đóng `REMINDER_OFFSET_CHOICES`.
+  reminderOffsets Int[]  @default([]) @map("reminder_offsets")
+  /// Bản tóm tắt hằng ngày: việc quá hạn + việc đến hạn hôm nay.
+  digestEnabled  Boolean @default(false) @map("digest_enabled")
+  /// Giờ gửi tóm tắt theo giờ địa phương của người dùng, tính bằng phút từ
+  /// 00:00 (480 = 08:00). SmallInt đủ cho 0..1439.
+  digestMinute   Int     @default(480) @map("digest_minute") @db.SmallInt
+  /// Ngày địa phương (`YYYY-MM-DD`) đã gửi tóm tắt — chặn gửi hai lần/ngày.
+  digestLastSentOn String? @map("digest_last_sent_on") @db.VarChar(10)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
 }
 
 model RefreshToken {
@@ -240,8 +264,13 @@ model Task {
   // The connected mailbox (MailAccount) that ingested this task from an email, if any.
   sourceMailAccountId String? @map("source_mail_account_id")
 
-  // Set once a Zalo deadline reminder has fired, so the hourly cron never re-notifies.
+  // Lần gần nhất một lời nhắc hạn qua Zalo được gửi cho việc này.
   deadlineNotifiedAt DateTime? @map("deadline_notified_at")
+  /// Mốc nhắc NHỎ NHẤT (phút trước hạn) đã gửi cho hạn hiện tại. Cron chỉ gửi
+  /// khi mốc đang tới nhỏ hơn giá trị này — nhờ vậy người chọn nhiều mốc (1 ngày
+  /// + 1 giờ) nhận đủ từng lời nhắc, còn mỗi mốc chỉ bắn một lần. Về NULL khi
+  /// hạn đổi (PATCH / snooze).
+  deadlineRemindedOffset Int? @map("deadline_reminded_offset")
 
   /// Lớp phân vùng: việc thuộc đúng một dự án, và dự án đó luôn là của
   /// `assignee` (không phải của người tạo, cũng không phải của chủ hộp thư đã

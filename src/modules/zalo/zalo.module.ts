@@ -9,9 +9,10 @@ import { ZaloAccountRepository } from './repositories/zalo-account.repository';
 import { ZaloLinkCodeRepository } from './repositories/zalo-link-code.repository';
 import { TasksModule } from '../tasks/tasks.module';
 import { UsersModule } from '../users/users.module';
+import { PreferencesModule } from '../preferences/preferences.module';
 
 @Module({
-  imports: [TasksModule, UsersModule],
+  imports: [TasksModule, UsersModule, PreferencesModule],
   controllers: [ZaloAccountsController, ZaloBotController],
   providers: [
     ZaloBotService,
