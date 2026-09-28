@@ -7,13 +7,13 @@ những gì **khác** hoặc **cần biết thêm** so với đặc tả.
 
 | # | Câu hỏi | Quyết định |
 |---|---|---|
-| 1 | Nới giới hạn tần suất? | **Có.** `move`, `snooze`, `PATCH /checklist-items/:id`, tạo thẻ và `lists/:id/move` chạy ở **120 req / 60 s** (`src/modules/board/board-throttle.ts`). Không cần `batch-move`. |
+| 1 | Nới giới hạn tần suất? | **Có.** `PATCH /tasks/:id/move`, `PATCH /tasks/:id/snooze`, `PATCH /lists/:id/move`, `POST /lists/:id/cards`, `POST /tasks/inbox/cards`, `POST /checklists/:id/items` và `PATCH /checklist-items/:id` chạy ở **120 req / 60 s** (`src/modules/board/board-throttle.ts`). Không cần `batch-move`. |
 | 2 | Múi giờ lưu ở đâu? | **Cả hai.** Thêm cột `User.timezone` (nullable). Thứ tự ưu tiên: `?tz=` → hồ sơ người dùng → `Asia/Ho_Chi_Minh`. |
 | 3 | Lưu đính kèm ở đâu? | **Chưa chốt** — chưa làm upload. `POST /tasks/:id/attachments` hiện nhận JSON `{ name, kind, url, sizeBytes }`, tức frontend tự có URL. Khi chốt S3 thì thêm endpoint xin URL upload, hợp đồng hiện tại không đổi. |
 | 4 | Việc lặp cách 1 hay 2? | **Cách 1** — sinh ngay khi hoàn thành, trả trong `next`. Không có job nền. |
 | 5 | `unaccent` đã bật chưa? | Migration `20260915000000_add_personal_board` có `CREATE EXTENSION IF NOT EXISTS "unaccent"`. Cần user DB có quyền tạo extension. |
 | 6 | Xoá mềm được không? | **Được.** `Task.deletedAt`; `DELETE /tasks/:id` là xoá mềm, `POST /tasks/:id/restore` khôi phục cả checklist lẫn ghi chú (chúng không bị xoá). |
-| 7 | Mỗi người một bảng? | **Giữ** `Board.ownerId @unique`. Bảng được tạo tự động ở lần gọi API bảng đầu tiên, kèm 5 danh sách mặc định và gán toàn bộ task cũ theo `status`. |
+| 7 | Mỗi người một bảng? | **Mỗi người một bảng cho mỗi dự án** — `@@unique([ownerId, projectId])` (từ khi có module projects). Bảng được tạo lười ở lần gọi API bảng đầu tiên có `projectId` đó (mọi route `/boards/me/*`, không riêng `/full`), kèm **1** cột mặc định "Hôm nay" (`mapsToStatus: TODO`), và nhận các task chưa có bảng của dự án đó. |
 
 ## Thay đổi phá vỡ tương thích — cần frontend sửaaa
 
@@ -45,15 +45,21 @@ nguyên.
   lúc tạo, `listId` để null. `/boards/me/full` còn nhận thêm mọi task mồ côi
   (`boardId = null`) của chính người gọi làm lưới an toàn cho dữ liệu cũ.
 - **Nhãn tạo slug tự động** từ tên (`Báo giá` → `baogia`), unique theo bảng.
+  Tạo/đổi tên trùng slug với nhãn khác trả `409 LABEL_NAME_TAKEN`; tên không
+  còn chữ/số nào trả `400 LABEL_NAME_INVALID`.
 - **WIP là cảnh báo.** Vượt giới hạn trả 200 kèm `warning: "LIST_WIP_EXCEEDED"`,
   không chặn thao tác kéo thả.
-- **`?undo=true`** trên **mọi endpoint ghi** để bỏ bước ghi nhật ký khi người
-  dùng bấm Ctrl+Z — kể cả endpoint chưa ghi nhật ký (`PATCH /lists/:id`,
-  `POST /tasks/:id/restore`), vì `forbidNonWhitelisted` sẽ trả 400 nếu không
-  nhận, và frontend không nên phải nhớ endpoint nào được gửi cờ.
+- **`?undo=true`** để bỏ bước ghi nhật ký khi người dùng bấm Ctrl+Z. **Chỉ**
+  nhận ở: `PATCH /tasks/:id`, `PATCH /tasks/:id/move`, `PATCH /tasks/:id/snooze`,
+  `PATCH /tasks/:id/complete`, `PATCH /tasks/:id/reopen`,
+  `POST /tasks/:id/restore` (không tác dụng), `PATCH /lists/:id` (không tác
+  dụng) và `PATCH /checklist-items/:id`. Gửi cờ tới endpoint ghi khác (nhãn,
+  checklist, ghi chú, đính kèm, `lists/:id/move`…) bị `forbidNonWhitelisted`
+  trả **400**.
   `complete?undo=true` còn **không sinh lại thẻ lặp**, tránh nhân đôi thẻ kế
   tiếp khi người dùng redo một thao tác hoàn thành.
-- **`PATCH /tasks/:id` ghi `DUE_CHANGED`** khi `deadline` đổi. Các trường khác
+- **`PATCH /tasks/:id` ghi `DUE_CHANGED`** khi `deadline` đổi, và reset cờ
+  đã-nhắc Zalo (giống `/snooze`) để hạn mới được nhắc lại. Các trường khác
   không ghi nhật ký.
 
 ## Script vận hành

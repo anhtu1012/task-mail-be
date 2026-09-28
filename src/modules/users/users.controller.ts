@@ -22,8 +22,8 @@ export class UsersController {
    * Danh sách người có thể được giao việc.
    *
    * CHỈ ADMIN. Người dùng thường không được nhìn danh bạ toàn hệ thống — họ
-   * cũng không cần: `POST /tasks` bỏ qua `assigneeId` của họ và luôn giao việc
-   * cho chính họ.
+   * cũng không cần: họ chỉ được giao việc cho chính mình (`POST /tasks` với
+   * `assigneeId` của người khác trả 403).
    *
    * Có endpoint này vì trước đó frontend không có cách nào biết ai là ai: ô
    * "Người thực hiện" ở form và bộ lọc buộc người dùng **gõ tay một UUID**.

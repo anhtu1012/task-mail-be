@@ -36,6 +36,7 @@ import { ProjectAccessService } from '../projects/services/project-access.servic
 import { repeatColumns } from '../../common/utils/recurrence.util';
 import { toRepeatDto } from '../board/mappers/card.mapper';
 import { TaskRepository } from './repositories/task.repository';
+import { TaskTypesService } from './task-types.service';
 import {
   CreateTaskDto,
   QueryTaskDto,
@@ -60,6 +61,7 @@ export class TasksService {
     private readonly boardService: BoardService,
     private readonly activityService: ActivityService,
     private readonly projectAccess: ProjectAccessService,
+    private readonly taskTypes: TaskTypesService,
   ) {}
 
   async list(
@@ -200,6 +202,8 @@ export class TasksService {
     if (dto.labelIds?.length) {
       await this.boardService.assertLabelsInBoard(board.id, dto.labelIds);
     }
+    // Không kiểm tra thì id lạ đi thẳng xuống khoá ngoại và thành 500.
+    if (dto.taskTypeId) await this.taskTypes.findById(dto.taskTypeId);
 
     const times = this.timeColumns(dto);
 
@@ -269,6 +273,7 @@ export class TasksService {
     if (labelIds && boardIdForLabels) {
       await this.boardService.assertLabelsInBoard(boardIdForLabels, labelIds);
     }
+    if (dto.taskTypeId) await this.taskTypes.findById(dto.taskTypeId);
 
     const updated = await this.taskRepository.update(id, {
       ...(move ?? {}),
@@ -329,6 +334,11 @@ export class TasksService {
         this.activityService.dueChanged(updated.deadline, timeZone),
         { from: task.deadline, to: updated.deadline },
       );
+    }
+    // Hạn mới = một lần nhắc Zalo mới, giống `/snooze`. Không reset thì dời
+    // hạn sau khi đã được nhắc sẽ không bao giờ được nhắc lại.
+    if (deadlineChanged && task.deadlineNotifiedAt) {
+      await this.taskRepository.clearDeadlineNotified(id);
     }
 
     return this.toResponse(updated);

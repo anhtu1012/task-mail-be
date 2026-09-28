@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { configModules } from './config';
+import { configModules, RateLimitConfig } from './config';
 import { PrismaModule } from './infrastructure/database/prisma.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -28,7 +28,14 @@ import { KeepAliveService } from './common/keep-alive/keep-alive.service';
     ConfigModule.forRoot({ isGlobal: true, load: configModules }),
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const { ttlMs, limit } =
+          config.getOrThrow<RateLimitConfig>('rateLimit');
+        return [{ ttl: ttlMs, limit }];
+      },
+    }),
     PrismaModule,
     CacheModule,
     UsersModule,

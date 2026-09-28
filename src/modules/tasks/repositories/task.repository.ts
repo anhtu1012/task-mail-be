@@ -250,6 +250,14 @@ export class TaskRepository {
     });
   }
 
+  /** Cho phép nhắc lại sau khi đổi hạn. */
+  clearDeadlineNotified(id: string): Promise<Task> {
+    return this.prisma.task.update({
+      where: { id },
+      data: { deadlineNotifiedAt: null },
+    });
+  }
+
   markDeadlineNotified(id: string): Promise<Task> {
     return this.prisma.task.update({
       where: { id },

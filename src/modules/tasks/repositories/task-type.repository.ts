@@ -26,6 +26,10 @@ export class TaskTypeRepository {
     return this.prisma.taskType.findUnique({ where: { id } });
   }
 
+  findByName(name: string): Promise<TaskType | null> {
+    return this.prisma.taskType.findUnique({ where: { name } });
+  }
+
   async create(input: CreateTaskTypeInput): Promise<TaskType> {
     const created = await this.prisma.taskType.create({ data: input });
     await this.cache.invalidate(CacheKeys.taskTypes());

@@ -5,6 +5,7 @@ import type { BoardAccessService } from '../board/services/board-access.service'
 import type { BoardService } from '../board/services/board.service';
 import type { ActivityService } from '../board/services/activity.service';
 import type { ProjectAccessService } from '../projects/services/project-access.service';
+import type { TaskTypesService } from './task-types.service';
 import { Role } from '../../common/enums/role.enum';
 import { TaskPriority } from '../../common/enums/task-priority.enum';
 import { TaskStatus } from '../../common/enums/task-status.enum';
@@ -59,6 +60,9 @@ describe('TasksService', () => {
       resolveForAutomation: jest.fn().mockResolvedValue({ id: 'project-1' }),
       requireOwnProject: jest.fn().mockResolvedValue({ id: 'project-1' }),
     } as unknown as ProjectAccessService;
+    const taskTypes = {
+      findById: jest.fn().mockResolvedValue({ id: 'type-1' }),
+    } as unknown as TaskTypesService;
     const service = new TasksService(
       taskRepository,
       eventEmitter,
@@ -66,6 +70,7 @@ describe('TasksService', () => {
       boardService,
       activityService,
       projectAccess,
+      taskTypes,
     );
     return {
       service,
