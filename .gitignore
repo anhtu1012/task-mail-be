@@ -2,5 +2,8 @@ node_modules
 # Keep environment variables out of version control
 .env
 
+# Output của scripts/db/backup.sh
+/backups
+
 /src/generated/prisma
 /dist
